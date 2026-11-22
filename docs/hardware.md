@@ -95,11 +95,12 @@ distribution board.
 |---|---|---|
 | MCU + radio | **ESP32-C6-WROOM-1-N8** (25.5 × 18 mm) | 8 MB flash matches `partitions.csv`. Pre-certified radio (CE/FCC), which matters for a product. Antenna at the board edge with copper keep-out. |
 | T1S MAC-PHY | **Microchip LAN8651** (VQFN-32, 5 × 5 mm) | as on the Two-Wire ETH Click, so firmware is unchanged |
-| T1S ESD | low-capacitance (< 3 pF) array, ≥ 24 V standoff, rated for T1S / CAN-FD | the bus carries PoDL DC, so standoff must exceed the bus voltage |
-| T1S coupling | common-mode choke + AC coupling caps per Microchip / OPEN Alliance T1S reference | |
-| Termination | 100 Ω **in series with a capacitor**, solder jumper | end nodes only. DC-blocked so it doesn't load the PoDL supply. |
-| PoDL decoupling | coupled inductor or 2 × power inductor, I_sat > bus current | follow the OPEN Alliance PoDL-for-T1S coupling guidance; simulate return loss |
-| Input protection / inrush | **TI TPS2660** eFuse (4.2–55 V, reverse polarity, adjustable current limit and dV/dt) | soft-start keeps hot-plugging from disturbing the bus |
+| T1S ESD / surge | low-capacitance (< 3 pF) ESD array with ≥ 33 V standoff, plus 2 × varistor line-to-GND (AN1848 PD uses TDK AVRH10C221KT1R5YA8, 220 V) | the bus carries 24 V DC, so 12 V-class automotive ESD parts are not usable |
+| T1S coupling (BIN) | CMC **TDK ACT1210D-131-2P** + 2 × 0.1 µF series caps, rated **≥ 50 V** (100 V preferred) | as on Microchip EVB-LAN8651 (AN1848 Fig. 6-2). At 24 V PoDL the series caps see the full bus voltage. |
+| Termination | 2 × 49.9 Ω + 2 × 0.22 µF / 100 V, jumper-selectable | the EVB-LAN8651 BIN (AN1848 Fig. 6-2) uses this AC-coupled split termination on jumpers; populate on end nodes only |
+| PoDL decoupling | **47 µH differential-mode choke** (DMC), or 47–68 µH coupled inductor (e.g. Coilcraft LPD5030-473 as in AN1848) | AN1848: DMC gives the best noise margin, uncoupled single inductors the worst. Needs matched values, a guaranteed minimum L (±20 % parts) and I_sat well above node current + inrush. At ~25 mA per node (0.5 W at 24 V) a small DMC (AN1848: 300 mA I_sat, 806 mΩ) is enough. |
+| Input protection / inrush | **TI TPS2660** eFuse (4.2–55 V, reverse polarity, adjustable current limit and dV/dt) | soft-start keeps hot-plugging from disturbing the bus. Bulk capacitance (AN1848 PD: 470 µF / 35 V) goes **behind** the eFuse, rated ≥ 35 V for a 24 V bus. |
+| Buck input filter | LC / π filter between eFuse and buck | AN1848 §6.3: extra noise on the PoDL setup was likely from the DC/DC with only 1 µF input filtering |
 | 3.3 V | **TI LMR36006** (60 V, 0.6 A buck) | 60 V rating gives surge margin on a 24 V bus. Load ≈ 120 mA peak. |
 | Gate supply | 12 V LDO from the **load** supply | outputs can only switch when the load supply is present |
 | Gate drivers | **2 × TI UCC27524A** (dual low-side) | see "PWM switching" below |
@@ -130,6 +131,47 @@ conduction and switching losses).
   LAN8651 / MDI ground.
 * Use floating (class II) SELV supplies for the loads, so several nodes with
   their own supplies don't form ground loops through the bus pair.
+
+### PoDL at 24 V: checked against Microchip AN1848
+
+Source: *AN1848 Using Power over Data Line functionality in 10BASE-T1S
+System*, DS60001848B (2025).
+
+**What the app note says**
+
+* There is **no PoDL standard for multidrop T1S**. IEEE 802.3cg only covers
+  point-to-point. Multidrop PoDL is an "engineered system": the PSE simply
+  powers known PDs, with no classification or negotiation (§2).
+* Their evaluation PSE runs from 12 V, with options for 12 V straight through
+  (16–36 V input), 4–9 V buck, or **16–24 V boost** output, plus slew-rate
+  limiting and high/low-side protection (Fig. 3-1). **All published
+  measurements are at ~12 V.**
+* Tested: up to **8 nodes**, segments up to 49 m, 22 AWG twisted pair
+  (0.46 Ω/m DC resistance as stated), nodes **≥ 15 cm apart**. PSE located at the end or in the middle of the segment.
+* Measured totals at 12 V with EVB-LAN8651 nodes: 2 nodes 160 mA, 5 nodes 480 mA,
+  8 nodes 740 mA, up to ~1 A under load steps (Tables 5-2, 5-3). PoDL had no
+  visible effect on eye shape, only slightly lower alien-noise margin (§7).
+* PSE injector: 47 µH coupled inductor rated 1.44 A (§6).
+
+**What that means for 24 V** (my assessment, not tested in the AN)
+
+| Aspect | 24 V vs 12 V |
+|---|---|
+| Line current for 8 × 0.5 W | ≈ 170 mA vs 330 mA: inductor saturation and DCR losses become a non-issue |
+| Voltage drop, J-Y(St)Y 0.8 mm (≈ 0.07 Ω/m loop), 25 m, PSE at end | ≈ 0.3 V, negligible at either voltage |
+| Component ratings | AC coupling caps, termination caps, bulk caps and ESD standoff must be rated for 24 V + surge (≥ 50 V caps, ≥ 33 V ESD standoff). The AN's 100 V / 220 V parts already are. |
+| Headroom | Leaves room for a few watts of extra node loads later, or longer segments |
+| Risk | Outside Microchip's measured range: validate eye/noise margin at 24 V on the bench (the AN's PSE concept does include a 16–24 V option) |
+
+**Verdict: 24 V is a sound choice**, provided the MDI-side parts are rated for
+it. Keep the design within the AN's tested envelope otherwise: ≤ 8 nodes,
+nodes ≥ 15 cm apart, 47 µH DMC or coupled inductor per node, filtered
+DC/DC input. Simulate the segment (Microchip used Keysight ADS; the AN shows
+simulation was slightly pessimistic vs measurement) and check the 15 ns jitter
+limit with alien noise.
+
+**PSE (at the bridge):** 24 V SELV PSU → current limit / eFuse ≈ 0.5 A →
+LC filter for PSU ripple → 47 µH coupled inductor (≥ 1 A) → bus.
 
 ## 4. Front board (46 × 46 mm, 2 layers)
 
@@ -175,8 +217,9 @@ rooms where you want a specific switch range.
 
 ## 7. Open points before layout
 
-1. **Bus voltage and PoDL current limit**: proposal 24 V, ≤ 100 mA per node
-   (0.5 W nominal, inrush-limited).
+1. **Bus voltage**: 24 V confirmed (see "PoDL at 24 V"). Remaining: PoDL
+   current limit per node, proposal ≤ 100 mA (0.5 W nominal, inrush-limited),
+   and the PSE current limit (≈ 0.5 A for 8 nodes).
 2. **Load current per output** (sets MOSFETs, terminals, fuse, heat): proposal
    ≤ 2 A per channel, ≤ 4 A total per node.
 3. **Cable**: J-Y(St)Y 2×2×0.8 with one pair for T1S + PoDL. The second pair is
