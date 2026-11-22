@@ -1,188 +1,188 @@
 # Wired Switchboard – Architecture
 
-A wired smart-home node: **nRF52840** + **10BASE-T1S** single-pair Ethernet,
-**powered over the data line**, speaking **MQTT** and **Matter**.
+A wired smart-home wall node: **ESP32-C6** + **Microchip LAN8651** 10BASE-T1S
+single-pair Ethernet, **powered over the data line**, with **Matter** and
+**MQTT** front-ends.
 
-Status: phase 1 scaffold (T1S + MQTT). Matter is phase 2, see §5. Not yet
-built on hardware (see the README's "Verification status" section).
+Per node:
+
+* up to 4 **keys** (momentary wall switches) → Matter Generic Switch events, MQTT
+  events, and local control of outputs
+* up to 4 **low-voltage PWM outputs** (MOSFET, 12/24 V LED strips) → Matter
+  Dimmable Light, HA MQTT light
+* up to 8 **indicator LEDs** (WS2812 chain, one per key) → follow their output or
+  are driven remotely
+* **SHT4x** temperature / humidity → Matter sensors, HA MQTT sensors
+
+Status: firmware scaffold, **not yet built or run on hardware** (see README).
 
 ---
 
-## 1. System overview
+## 1. Why ESP32-C6 (the MCU change)
 
-```
-                        home LAN (IPv4 + IPv6, mDNS)
-   ┌───────────────┐          │
-   │ QNAP NAS      │──────────┤
-   │  Mosquitto    │          │
-   │  Home Assist. │          │        ┌────────────────────────────┐
-   │  (Matter ctrl)│          ├────────│ T1S ↔ 100BASE-TX bridge    │
-   └───────────────┘          │        │ Linux box + EVB-LAN8670-USB│
-                              │        │ PLCA coordinator (node 0)  │
-                              │        │ + PoDL power injector      │
-                              │        └─────────────┬──────────────┘
-                              │                      │ 1 twisted pair, multidrop
-                              │      ════════════════╪════════╤═════════╤═══  (≤25 m, ≥8 nodes)
-                              │                      │        │         │
-                              │                 ┌────┴───┐┌───┴────┐┌───┴────┐
-                              │                 │ node 1 ││ node 2 ││ node n │
-                              │                 └────────┘└────────┘└────────┘
-```
-
-Each node:
-
-```
- T1S pair ──┬── coupling (CMC + AC caps) ── LAN8651 MAC-PHY ──SPI (16 MHz)── nRF52840
-            │                                  IRQ_N, RESET_N ──────────────┤
-            └── PoDL decoupling (inductors) ── TVS / reverse prot. ──┐      ├── relays (GPIO → driver)
-                                                                     │      ├── switch inputs (opto/RC)
-                         bus voltage sense (divider) ── SAADC ◄──────┤      ├── status LED
-                                                                     │      └── BLE (Matter commissioning)
-                                        wide-input buck → 3.3 V ─────┘
-```
-
-## 2. Hardware decisions
-
-| Topic | Decision | Rationale |
+| | nRF52840 (v0.1) | **ESP32-C6** (now) |
 |---|---|---|
-| Ethernet MAC | **Microchip LAN8650/8651** (OPEN Alliance TC6 MAC-PHY over SPI) | nRF52840 has no Ethernet MAC/RMII. LAN865x has an upstream Zephyr driver (`microchip,lan865x`) incl. PLCA config. LAN8651 = 3.3 V I/O variant. |
-| SPI | **SPIM3** @ 16 MHz | Only nRF52840 SPIM > 8 MHz. SPIM3 offers 16/32 MHz, LAN865x max is 25 MHz → 16 MHz. TC6 overhead (4 B per 64 B chunk) leaves comfortably > 10 Mbit/s. |
-| Media access | **PLCA** (802.3cg clause 148) | Deterministic, no collisions on a multidrop segment. Node ID provisioned per node (`sb plca <id>`), coordinator = bridge (node 0). |
-| MAC address | Locally administered from FICR DEVICEID | Good for development. For a product: OUI block or EUI-48 EEPROM (e.g. 24AA02E48). |
-| Power | **PoDL** – DC superimposed on the pair, inductive decoupling | Power on *multidrop* T1S is still being standardised (IEEE 802.3da); point-to-point PoDL (802.3bu/cg) does not cover a mixing segment. Treat it as a *custom* "DC on the pair" design for now: e.g. 24 V, current-limited injector at the bridge. |
-| Bootloader | MCUboot (sysbuild) | DFU over SMP; later over the network (SMP/UDP). |
+| Matter over Ethernet | not supported in Nordic's Matter port: porting job | supported in the upstream ESP32 platform (`ConnectivityManagerImpl_Ethernet`, `ESPEthernetDriver`); Espressif ships an Ethernet light example |
+| LAN865x driver | Zephyr upstream | Espressif `espressif/lan865x` |
+| RAM / flash | 256 kB / 1 MB, too small for Matter + MQTT + OTA | 512 kB SRAM / 8 MB ext. flash, 3 MB OTA slots |
+| Commissioning | BLE | BLE (NimBLE, freed after commissioning) |
 
-### PoDL design notes (hardware checklist)
+Remaining gap: the ESP32 Ethernet driver in connectedhomeip hardcodes the
+internal EMAC + IP101 PHY, which the C6 doesn't have. The fix is a 50-line
+patch (`firmware/patches/0001-esp32-ethernet-app-init-hook.patch`) that adds a
+weak `esp_matter_app_ethernet_init()` hook. The app implements it in
+`eth_t1s.c` and installs the LAN865x SPI driver; Matter still attaches the
+netif and starts it. The patch is upstreamable.
 
-* Decoupling inductors must keep their inductance at the full DC load
-  current (saturation!) and present high impedance down to the low end of
-  the T1S spectrum – that is the dominant cause of signal integrity issues.
-  Use the LAN865x / OPEN Alliance coupling recommendations as the starting
-  point and simulate the network (you have Simulink/Simscape: a lumped
-  LC + line model is enough to check droop and return loss trends).
-* Multidrop + power: worst case is the far-end node with all relays on.
-  Budget: bus voltage × allowable drop vs. cable resistance × Σ load.
-  Relay coils dominate – prefer latching relays or SSRs/MOSFETs.
-* Inrush: each node needs a soft-start / current limit on its buck input,
-  otherwise hot-plugging a node disturbs the bus voltage for everyone.
-* Firmware side: monitor bus voltage on SAADC (planned module
-  `power_mon`), flush pending state to NVS on brown-out warning (POFWARN),
-  and stagger relay switching after power-up.
-* Brown-outs are *expected* events → channel state restore is on by default
-  (`CONFIG_APP_STATE_RESTORE`, debounced NVS write to limit wear).
+**Risk to retire first:** SPI MAC-PHY + Matter is not one of Espressif's
+tested configurations. Week-1 spike: commission the node into Home Assistant
+over T1S and check that mDNS (`_matter._tcp`) and IPv6 work through the bridge.
 
-## 3. Software architecture
+## 2. System overview
 
 ```
- ┌────────────────────────────────────────────────────────────────────┐
- │  Front-ends            mqtt_app.c          matter/ (phase 2, C++)   │
- │                        HA discovery        On/Off clusters          │
- │                            ▲  │                 ▲  │                │
- │                  listener  │  │ dm_set()        │  │                │
- │  ┌─────────────────────────┴──▼─────────────────┴──▼─────────────┐  │
- │  │  device_model.c  – single owner of channel state, persistence │  │
- │  └─────────────────────────▲──┬──────────────────────────────────┘  │
- │                  dm_toggle │  │ listener                            │
- │  io_board.c  buttons ──────┘  └──► relays          status_led.c     │
- │                                                                     │
- │  net_t1s.c  MAC, PLCA, hostname, DHCPv4/IPv6, conn_mgr L4 events    │
- │  app_settings.c (NVS)      app_shell.c (`sb …` provisioning)        │
- ├─────────────────────────────────────────────────────────────────────┤
- │  Zephyr: net stack (IPv4/IPv6/TCP/UDP, mDNS), MQTT lib, settings    │
- │  eth_lan865x + OA TC6 + microchip,t1s-phy        MCUboot / mcumgr   │
- └─────────────────────────────────────────────────────────────────────┘
+   ┌──────────────────┐                                ┌──────────────────────────────┐
+   │ QNAP NAS         │        home LAN                │ T1S ↔ 100BASE-TX bridge      │
+   │  Mosquitto       ├──────────────┬─────────────────┤ Linux + EVB-LAN8670-USB      │
+   │  Home Assistant  │              │                 │ PLCA coordinator (node 0)    │
+   │  + Matter server │        phone (BLE commission)  │ + PoDL injector (24 V)       │
+   └──────────────────┘                                └──────────────┬───────────────┘
+                                                                      │ 1 pair, multidrop
+                                 ═════════════════════════════╤═══════╪═══════╤═══════
+                                                          ┌───┴───┐┌──┴────┐┌─┴─────┐
+                                                          │node 1 ││node 2 ││node n │
+                                                          └───────┘└───────┘└───────┘
 ```
 
-Key rules:
+Node:
 
-1. **The device model owns the state.** MQTT, Matter, buttons and the
-   shell only *request* changes. No protocol talks to another protocol.
-   This is what keeps Home Assistant (via MQTT) and a Matter controller
-   consistent when both are used.
-2. **Listeners must not block.** They run on the system work queue.
-   `mqtt_app` only marks channels dirty; its own thread publishes.
-3. **Network-agnostic front-ends.** They wait for conn_mgr's "L4 connected"
-   and reconnect with jittered exponential backoff (important when many
-   nodes on one segment lose power together).
+```
+T1S pair ─┬─ CMC + AC coupling ─ LAN8651 ══SPI 20 MHz══ ESP32-C6 ─┬─ keys (GPIO, RC + TVS)
+          │                       IRQ_N, RESET_N ────────┘         ├─ PWM ─ MOSFETs ─ 12/24 V LED loads
+          └─ PoDL decoupling L ─ protection ─ buck 3.3 V           ├─ WS2812 key LEDs
+                                                                    └─ I2C ─ SHT4x
+```
 
-### MQTT topic layout
+## 3. Software architecture (ESP-IDF v6.0.2 + esp-matter 1.6.1)
+
+```
+  matter_app.cpp          mqtt_app.c              local_control.c
+  endpoints, events       HA discovery, JSON      key→output, dimming, LED follow
+        ▲  │                  ▲  │                      ▲  │
+        │  │ dm_*()           │  │ dm_*()               │  │ dm_*()
+  ┌─────┴──▼──────────────────┴──▼──────────────────────┴──▼─────┐
+  │ device_model.c: single owner of state, event queue + task    │
+  └─────▲─────────────────────▲───────────┬──────────┬───────────┘
+        │ dm_key_event        │ dm_sensor │ events   │ events
+   inputs.c (10 ms scan)  sensors.c    outputs.c  indicators.c
+                                        LEDC PWM   WS2812 (RMT)
+  eth_t1s.c: LAN865x hook, PLCA, MAC, hostname   app_settings.c (NVS) + app_console.c (`sb`)
+```
+
+Rules:
+
+1. **The device model owns the state.** Front-ends and local logic call
+   `dm_*` setters and receive events. Nobody talks to anybody else directly.
+2. **Events only on change.** This breaks Matter ↔ MQTT echo loops by design.
+   `matter_app` also suppresses callbacks caused by its own `attribute::update()`.
+3. **Threads:** listeners run on the DM task. Matter work is marshalled with
+   `SystemLayer().ScheduleLambda()`, and MQTT uses the thread-safe
+   `esp_mqtt_client_enqueue()`.
+4. **Works offline.** Keys switch and dim their mapped output with no
+   controller or broker. Events are still sent to both front-ends for scenes.
+
+### Key event model
+
+Keys implement the Matter Switch cluster with MS | MSR | MSL | MSM:
+
+| Gesture | Matter events | MQTT `event_type` | Local action |
+|---|---|---|---|
+| single | InitialPress, ShortRelease, MultiPressComplete(1) | `single` | toggle output |
+| double | … MultiPressOngoing(2) … MultiPressComplete(2) | `double` | output on at 100 % |
+| triple | … MultiPressComplete(3) | `triple` | – (automations) |
+| hold | InitialPress, LongPress … LongRelease | `long_press`, `long_release` | dim up/down |
+
+Local toggling happens on *release*, so it isn't delayed by the multi-press
+window. For a double press, that means the output toggles first and then goes
+to 100 %.
+
+### Matter endpoints (4 keys / 4 outputs / 4 LEDs / sensor)
+
+| EP | Device type | Purpose |
+|---|---|---|
+| 0 | Root Node | Ethernet network commissioning, OTA requestor |
+| 1–4 | Generic Switch | keys |
+| 5–8 | Dimmable Light | outputs |
+| 9–12 | On/Off Light | key LEDs (when not in "follow" mode) |
+| 13, 14 | Temperature, Humidity Sensor | SHT4x (only if detected) |
+
+### MQTT topics
 
 | Topic | Dir | Payload |
 |---|---|---|
 | `switchboard/<name>/status` | pub, retained, LWT | `online` / `offline` |
-| `switchboard/<name>/ch/<n>/state` | pub, retained | `ON` / `OFF` |
-| `switchboard/<name>/ch/<n>/set` | sub, QoS 1 | `ON` / `OFF` / `TOGGLE` |
-| `homeassistant/switch/<name>/ch<n>/config` | pub, retained | HA discovery JSON |
+| `…/out/<n>/state`, `…/out/<n>/set` | pub / sub | `{"state":"ON","brightness":1..254}` |
+| `…/ind/<n>/state`, `…/ind/<n>/set` | pub / sub | `ON` / `OFF` |
+| `…/key/<n>/event` | pub | `{"event_type":"double"}` |
+| `…/sensor/temperature`, `…/sensor/humidity` | pub, retained | `21.50`, `45.00` |
+| `homeassistant/{light,switch,event,sensor}/<id>/…/config` | pub, retained | discovery |
 
-## 4. Memory budget (nRF52840: 1 MB flash, 256 kB RAM)
+## 4. Hardware notes
 
-Rough estimates, **to be replaced with `west build -t rom_report/ram_report`**:
+### Default pin map (ESP32-C6-DevKitC-1, all in `menuconfig → Wired Switchboard`)
 
-| Item | Flash | RAM |
+| Function | GPIO | Notes |
 |---|---|---|
-| Zephyr kernel, drivers, shell, logging | ~70 kB | ~25 kB |
-| Net stack (IPv4+IPv6, TCP, DHCP, mDNS) + buffers | ~110 kB | ~60 kB |
-| MQTT + app | ~25 kB | ~15 kB |
-| MCUboot | 48 kB | – |
-| **Phase 1 total** | **~250 kB + 2× slot** | **~100 kB** |
-| Matter (no Thread, BLE commissioning, mbedTLS/PSA) | +450–550 kB | +90–110 kB |
+| LAN8651 SCLK / MOSI / MISO / CS | 6 / 7 / 2 / 10 | SPI2, 20 MHz (LAN865x max 25) |
+| LAN8651 IRQ_N / RESET_N | 11 / 3 | |
+| Keys 0–3 | 0, 1, 4, 5 | active low, internal pull-up. Fit external pull-ups + RC + TVS for wall cabling |
+| PWM outputs 0–3 | 18, 19, 20, 21 | LEDC 12 bit @ 19.5 kHz → logic-level MOSFET gate drivers |
+| WS2812 data | 8 | on-board RGB LED = indicator 0 |
+| I2C SDA / SCL | 22 / 23 | SHT4x @ 0x44 |
+| Factory reset | 9 (BOOT) | hold 10 s |
 
-Conclusion: phase 1 fits easily with both MCUboot slots in internal flash.
-**Phase 2 does not fit with two internal slots** → secondary slot on
-external QSPI NOR (MX25R64 on the DK; plan a 2–8 MB QSPI/SPI NOR on the
-custom board from day one). RAM for Matter + IPv4/IPv6 + MQTT is tight but
-feasible; Thread is not used, which saves ~40 kB RAM vs. the usual nRF52840
-Matter builds.
+Avoid: GPIO 12/13 (USB-JTAG console), 16/17 (UART0), 24–30 (flash), and
+strapping pins 8/9/15 for anything that loads them at boot.
 
-## 5. Matter over 10BASE-T1S – the main technical risk
+The MIKROE Two-Wire ETH Click needs transistor Q1 removed for ESP32 SPI
+timing (its CS LED slows the CS edge), per Espressif's driver README.
 
-Matter is IP-based and transport-agnostic, so Ethernet is a legitimate
-transport (Matter defines an Ethernet network commissioning feature).
-However, **Nordic's Matter port does not support Ethernet today**: in NCS
-v3.3.0 `src/platform/nrfconnect/CHIPDevicePlatformConfig.h` states
-*"nrfconnect platform does not support ethernet yet"* and forces
-`CHIP_DEVICE_CONFIG_ENABLE_ETHERNET 0`. Nordic's Matter samples on nRF52840
-are Thread-only.
+### Power over the data line: budget first
 
-What is needed (phase 2 work package):
+* **The LED loads decide everything.** A 24 V / 1 A strip is 24 W per channel.
+  That is far beyond what a shared multidrop pair can deliver to many nodes.
+  Recommended: power the loads from a local 12/24 V supply (or a separate
+  power pair in the same cable), and power only the electronics from the
+  data line: ESP32-C6 ≈ 25–35 mA with BLE idle, LAN8651 ≈ 40 mA, LEDs and
+  sensor a few mA, so ≈ **0.5 W per node**.
+* Power on *multidrop* T1S is still being standardised (IEEE 802.3da), so
+  treat it as a custom "DC on the pair" design for now: e.g. 24 V,
+  current-limited injector at the bridge, inductive decoupling at every node.
+* Decoupling inductors must hold their inductance at full DC current and stay
+  high-impedance down to the low end of the T1S spectrum. Simulate the segment
+  (Simscape: lumped LC + line) for droop and return loss.
+* Inrush limiting / soft-start on every node's buck input, or hot-plugging
+  disturbs the bus voltage for everyone.
+* Brown-outs are expected: output state is saved to NVS (2 s debounce) and
+  restored at boot. Planned: bus-voltage monitoring on the ADC, plus staggered
+  output start after power-up.
+* SHT4x placement: the buck and the MCU warm the PCB. Thermally isolate the
+  sensor (PCB slot, bottom of enclosure) or calibrate an offset.
 
-1. Build Matter with Thread and Wi-Fi off, Ethernet on
-   (`CHIP_DEVICE_CONFIG_ENABLE_ETHERNET=1`). The shared Zephyr platform layer
-   (`src/platform/Zephyr/ConnectivityManagerImpl.cpp`) already has Ethernet
-   code paths (multicast join etc.), so this is mostly Kconfig/GN plumbing
-   in the `nrfconnect` platform.
-2. Implement a small **`EthernetDriver`** for the Network Commissioning
-   cluster (Ethernet feature: no credentials, just report the interface).
-3. Use **minimal mDNS** from the Matter SDK for operational discovery – and
-   then **disable Zephyr's `MDNS_RESPONDER`** to avoid two responders on
-   UDP 5353 (or keep Zephyr's and implement the Matter DNS-SD platform API
-   on top of it; minimal mDNS is less work).
-4. Commissioning: over **BLE** (the nRF52840's radio is otherwise unused),
-   or on-network (DNS-SD `_matterc._udp`) since Ethernet is always up. BLE is
-   the smoother path with phone-based controllers.
-5. Add a `matter/` front-end (C++) that maps On/Off cluster endpoints 1…n to
-   device-model channels and registers a DM listener for attribute reports.
+## 5. Memory / flash
 
-Network prerequisites: the T1S bridge must forward IPv6 link-local and
-multicast (mDNS) between the T1S segment and the home LAN, i.e. a **bridge,
-not a router**. A plain Linux bridge does that.
-
-Fallback options if (1)–(3) turn out heavier than expected:
-
-* **Bridge pattern:** keep the nodes MQTT-only and expose them to Matter via
-  a Matter bridge on the NAS / Linux box (e.g. the community *Matterbridge* project in a
-  container on the NAS, or a custom `chip-bridge-app`). Cheapest, but the node itself is
-  not Matter certified-able.
-* **Bigger MCU:** nRF54L15 (1.5 MB RRAM, 256 kB RAM, same SDK) or nRF5340
-  (1 MB + 256 kB app core, network core for BLE) relieve the flash pressure;
-  the Ethernet port work is the same.
+8 MB flash: 2 × 3 MB OTA slots, NVS, factory partition (Matter DAC/PAI for
+production). Unused Matter clusters are disabled in `sdkconfig.defaults`.
+Expected image size is ~1.6–1.9 MB. Measure with `idf.py size` on the first
+build. RAM: Matter + lwIP + BLE (commissioning only) + MQTT fits in 512 kB
+with margin; BLE is freed after commissioning.
 
 ## 6. Roadmap
 
 | Phase | Content | Exit criterion |
 |---|---|---|
-| 0 | DK + LAN8651 click, Linux bridge with EVB-LAN8670-USB | `ping` and `zperf` over T1S with PLCA, 2+ nodes |
-| 1 | **this scaffold**: device model, I/O, settings, MQTT + HA discovery | Channels switchable from HA, state survives power cycle |
-| 1.1 | `power_mon` (SAADC + POFWARN), MQTT over TLS, SMP over UDP for network DFU | Field-updatable, secure broker connection |
-| 2 | Matter over Ethernet (§5), external flash secondary slot | Commissioned in HA Matter + Apple/Google, MQTT still in sync |
-| 3 | Custom board: PoDL front-end, relay drivers, EMC | Hardware validated on a 25 m multidrop segment |
+| 0 | DevKitC-1 + Two-Wire ETH Click, Linux bridge with EVB-LAN8670-USB | `ping` over T1S with PLCA, 2+ nodes |
+| 1 | **this scaffold**: build, then commission over BLE into HA Matter, MQTT discovery | keys, outputs, LEDs, sensor in HA via both paths, in sync |
+| 1.1 | MQTT over TLS, NVS encryption, bus-voltage monitor, Matter Binding (direct key → remote light without HA) | works without the HA host |
+| 2 | Custom board: PoDL front-end, MOSFET stage, key inputs with protection, EMC | 25 m segment, 8 nodes, hot-plug |
+| 3 | Production: DAC/PAI provisioning, secure boot + flash encryption, certification decision | – |

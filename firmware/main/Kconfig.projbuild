@@ -1,0 +1,163 @@
+menu "Wired Switchboard"
+
+    config APP_DEVICE_NAME
+        string "Default device name (MQTT topics, hostname)"
+        default "switchboard"
+
+    menu "10BASE-T1S (LAN8651 on SPI)"
+        config T1S_SPI_HOST
+            int "SPI host (1 = SPI2)"
+            default 1
+        config T1S_SPI_CLOCK_MHZ
+            int "SPI clock [MHz] (LAN865x max 25)"
+            range 1 25
+            default 20
+        config T1S_GPIO_SCLK
+            int "SCLK GPIO"
+            default 6
+        config T1S_GPIO_MOSI
+            int "MOSI GPIO"
+            default 7
+        config T1S_GPIO_MISO
+            int "MISO GPIO"
+            default 2
+        config T1S_GPIO_CS
+            int "CS GPIO"
+            default 10
+        config T1S_GPIO_INT
+            int "IRQ_N GPIO"
+            default 11
+        config T1S_GPIO_RST
+            int "RESET_N GPIO (-1 = not connected)"
+            default 3
+        config T1S_PLCA_NODE_ID
+            int "Default PLCA node ID (0 = coordinator, 255 = PLCA off / CSMA-CD)"
+            range 0 255
+            default 1
+        config T1S_PLCA_NODE_COUNT
+            int "Default PLCA node count"
+            range 1 255
+            default 8
+        config T1S_PLCA_TO_TIMER
+            int "PLCA transmit opportunity timer [bit times]"
+            default 32
+        config T1S_PLCA_BURST_COUNT
+            int "PLCA max burst count"
+            default 0
+        config T1S_PLCA_BURST_TIMER
+            int "PLCA burst timer [bit times]"
+            default 128
+    endmenu
+
+    menu "Keys (wall switch inputs)"
+        config KEY_COUNT
+            int "Number of keys"
+            range 0 4
+            default 4
+        config KEY_GPIO_0
+            int "Key 0 GPIO"
+            default 0
+        config KEY_GPIO_1
+            int "Key 1 GPIO"
+            default 1
+        config KEY_GPIO_2
+            int "Key 2 GPIO"
+            default 4
+        config KEY_GPIO_3
+            int "Key 3 GPIO"
+            default 5
+        config KEY_ACTIVE_LOW
+            bool "Keys are active low (to GND, internal pull-up)"
+            default y
+        config KEY_LONG_PRESS_MS
+            int "Long press threshold [ms]"
+            default 500
+        config KEY_MULTI_PRESS_WINDOW_MS
+            int "Multi-press window [ms]"
+            default 350
+        config KEY_MULTI_PRESS_MAX
+            int "Max presses in a multi-press sequence"
+            range 2 4
+            default 3
+        config KEY_FACTORY_RESET_GPIO
+            int "Factory reset button GPIO (hold 10 s, -1 = none)"
+            default 9
+    endmenu
+
+    menu "Low-voltage PWM outputs (dimmable)"
+        config OUTPUT_COUNT
+            int "Number of outputs"
+            range 0 4
+            default 4
+        config OUTPUT_GPIO_0
+            int "Output 0 GPIO"
+            default 18
+        config OUTPUT_GPIO_1
+            int "Output 1 GPIO"
+            default 19
+        config OUTPUT_GPIO_2
+            int "Output 2 GPIO"
+            default 20
+        config OUTPUT_GPIO_3
+            int "Output 3 GPIO"
+            default 21
+        config OUTPUT_PWM_FREQ_HZ
+            int "PWM frequency [Hz]"
+            default 19531
+            help
+                Above audible range and flicker-free for cameras. 80 MHz / 4096 = 19.5 kHz
+                at 12-bit resolution.
+        config OUTPUT_FADE_MS
+            int "Fade time per level change [ms]"
+            default 150
+    endmenu
+
+    menu "Indicator LEDs (WS2812 chain)"
+        config INDICATOR_COUNT
+            int "Number of indicator LEDs"
+            range 0 8
+            default 4
+        config INDICATOR_GPIO
+            int "Data GPIO"
+            default 8
+            help
+                GPIO8 drives the on-board RGB LED of the ESP32-C6-DevKitC-1, so
+                indicator 0 is visible without extra hardware.
+        config INDICATOR_BRIGHTNESS
+            int "Brightness (0-255)"
+            default 40
+    endmenu
+
+    menu "Sensors"
+        config SENSOR_SHT4X
+            bool "SHT4x temperature / humidity sensor (I2C 0x44)"
+            default y
+        config SENSOR_I2C_SDA
+            int "I2C SDA GPIO"
+            default 22
+        config SENSOR_I2C_SCL
+            int "I2C SCL GPIO"
+            default 23
+        config SENSOR_PERIOD_S
+            int "Sampling period [s]"
+            default 30
+    endmenu
+
+    menu "MQTT"
+        config APP_MQTT
+            bool "MQTT front-end with Home Assistant discovery"
+            default y
+        config APP_MQTT_BROKER_URI
+            string "Default broker URI"
+            default "mqtt://mqtt.local:1883"
+            depends on APP_MQTT
+        config APP_MQTT_TOPIC_PREFIX
+            string "Topic prefix"
+            default "switchboard"
+            depends on APP_MQTT
+        config APP_MQTT_HA_PREFIX
+            string "Home Assistant discovery prefix"
+            default "homeassistant"
+            depends on APP_MQTT
+    endmenu
+endmenu

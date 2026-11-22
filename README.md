@@ -1,140 +1,137 @@
 # Wired Switchboard
 
-A wired home-automation node: **nRF52840** + **10BASE-T1S** single-pair Ethernet
-(Microchip **LAN8651** MAC-PHY over SPI), **powered over the data line**, with
-**MQTT** (Home Assistant discovery) and **Matter** front-ends.
+A wired home-automation wall node: **ESP32-C6** + **10BASE-T1S** single-pair
+Ethernet (Microchip **LAN8651** MAC-PHY over SPI), **powered over the data line**,
+speaking **Matter** (over Ethernet) and **MQTT** (Home Assistant discovery).
 
-* Firmware: nRF Connect SDK **v3.3.0** (Zephyr 4.3.99), C
-* Phase 1 (this repo now): T1S networking with PLCA, relay/button I/O, persistent
-  state, MQTT + HA auto-discovery, provisioning shell, MCUboot
-* Phase 2: Matter over Ethernet. Needs porting work, because Nordic's Matter port
-  doesn't support Ethernet yet. See [docs/architecture.md §5](docs/architecture.md#5-matter-over-10base-t1s--the-main-technical-risk)
+* Keys (wall switches): Matter Generic Switch events, MQTT events, local control
+* Low-voltage PWM outputs: dimmable lights
+* Key indicator LEDs (WS2812)
+* Temperature / humidity (SHT4x)
 
-Architecture, hardware notes (PoDL, PLCA, memory budget) and roadmap:
+Design, hardware notes (pins, PoDL budget) and roadmap:
 **[docs/architecture.md](docs/architecture.md)**
 
-## Repository layout
+> v0.1 targeted the nRF52840 with Zephyr. It moved to ESP32-C6 because Matter
+> over Ethernet works there with only a small hook patch. The Zephyr code is in
+> git history (commit `7dc1a80`).
+
+## Layout
 
 ```
-west.yml                     workspace manifest (pins NCS v3.3.0)
-app/
-  CMakeLists.txt  Kconfig  prj.conf  sysbuild.conf  VERSION
-  overlay-debug.conf  overlay-release.conf
-  boards/nrf52840dk_nrf52840.overlay   LAN8651 on Arduino SPI + I/O mapping
-  src/
-    main.c            init order
-    device_model.*    single owner of channel state (+ NVS persistence)
-    io_board.*        relays, buttons, factory-reset button (from DT zephyr,user)
-    net_t1s.*         MAC from FICR, PLCA, hostname, DHCP, online events
-    mqtt_app.*        MQTT client, HA discovery, command handling
-    app_settings.*    provisioned config in NVS
-    app_shell.c       `sb …` shell commands
-    status_led.*      status LED patterns
+firmware/
+  CMakeLists.txt  sdkconfig.defaults  partitions.csv (8 MB)
+  patches/0001-esp32-ethernet-app-init-hook.patch   connectedhomeip hook for SPI Ethernet
+  main/
+    app_main.cpp      init order
+    device_model.*    single owner of state, event fan-out task
+    eth_t1s.*         LAN865x install (Matter hook), MAC, PLCA, hostname, IP events
+    matter_app.cpp    endpoints, Matter <-> device model
+    mqtt_app.*        esp-mqtt, HA discovery, JSON commands
+    inputs.*          key scan, Matter momentary-switch event model
+    outputs.*         LEDC PWM with gamma + fades
+    indicators.*      WS2812 key LEDs
+    sensors.*         SHT4x
+    local_control.*   offline key -> output logic, LED follow
+    app_settings.*    NVS config        app_console.c   `sb` commands
+    Kconfig.projbuild pins and counts   idf_component.yml
 docs/architecture.md
 ```
 
-## Workspace setup
+## Toolchain setup (Linux, once)
 
 ```bash
-# Toolchain (once)
-nrfutil sdk-manager toolchain install --ncs-version v3.3.0
+mkdir -p ~/esp && cd ~/esp
+git clone -b v6.0.2 --recursive https://github.com/espressif/esp-idf.git
+./esp-idf/install.sh esp32c6
 
-# Workspace with this repo as manifest
-nrfutil sdk-manager toolchain launch --ncs-version v3.3.0 -- \
-  west init -m https://github.com/siphi1239/wired_switchboard --mr main ~/ws-switchboard
-cd ~/ws-switchboard
-nrfutil sdk-manager toolchain launch --ncs-version v3.3.0 -- west update
+git clone -b release/v1.6.1 --depth 1 https://github.com/espressif/esp-matter.git
+cd esp-matter
+git submodule update --init --depth 1
+cd connectedhomeip/connectedhomeip
+./scripts/checkout_submodules.py --platform esp32 linux --shallow
+# Ethernet hook for SPI MAC-PHYs (required, the build stops without it):
+git apply ~/src/wired_switchboard/firmware/patches/0001-esp32-ethernet-app-init-hook.patch
+cd ../..
+. ~/esp/esp-idf/export.sh
+./install.sh
 ```
 
-> Tip: `alias ncs='nrfutil sdk-manager toolchain launch --ncs-version v3.3.0 -- '`
-
-## Build & flash (nRF52840-DK + LAN8651 click)
+Per shell:
 
 ```bash
-cd ~/ws-switchboard/wired_switchboard/app
-
-ncs west build -b nrf52840dk/nrf52840 --sysbuild -p
-ncs west build -b nrf52840dk/nrf52840 --sysbuild -p -- -DEXTRA_CONF_FILE=overlay-debug.conf
-
-# Console on USB CDC-ACM (nRF USB port) instead of the J-Link VCOM:
-ncs west build -b nrf52840dk/nrf52840 --sysbuild -p -S cdc-acm-console
-
-ncs west flash
+. ~/esp/esp-idf/export.sh && . ~/esp/esp-matter/export.sh
 ```
 
-Wiring (DK Arduino header → LAN8651): D13 SCK, D12 MISO, D11 MOSI, D10 CS,
-**D7 IRQ_N, D8 RESET_N**. Change the last two in
-`app/boards/nrf52840dk_nrf52840.overlay` to match your click shield.
+## Build, flash, monitor (ESP32-C6-DevKitC-1-N8)
+
+```bash
+cd firmware
+idf.py set-target esp32c6
+idf.py menuconfig          # Wired Switchboard -> pins, counts, PLCA, MQTT
+idf.py build
+idf.py -p /dev/ttyACM0 flash monitor
+```
+
+The DevKit's USB port is the console (USB-Serial-JTAG).
 
 ## Bring-up
 
-### 1. The Linux side of the T1S segment (bridge + PLCA coordinator)
+### 1. Linux side of the T1S segment (bridge + PLCA coordinator)
 
-A USB T1S adapter (e.g. Microchip **EVB-LAN8670-USB**) on any Linux box (a
-Raspberry Pi works; the DGX Spark also works for lab use), bridged to the home LAN:
+Any Linux box with a USB T1S adapter (e.g. Microchip **EVB-LAN8670-USB**),
+bridged so that IPv6 link-local and mDNS reach the nodes (Matter needs this):
 
 ```bash
-# PLCA coordinator: node 0, segment size 8
 sudo ethtool --set-plca-cfg eth1 enable on node-id 0 node-cnt 8
-sudo ethtool --get-plca-status eth1
-
-# L2 bridge so IPv6 link-local + mDNS reach the nodes (required for Matter)
 sudo ip link add br0 type bridge
 sudo ip link set eth0 master br0 && sudo ip link set eth1 master br0
 sudo ip link set br0 up
 ```
 
-Inject PoDL power at this end through the coupling network (see architecture doc).
-
-### 2. Provision the node (shell on the console)
+### 2. Provision the node (console)
 
 ```
 sb show
-sb plca 1 8                 # unique node id per node, 1..7 here
-sb name kitchen-board       # MQTT topic / HA device id
-sb mqtt 192.168.1.10 1883   # Mosquitto on the QNAP
-sb ch 0 toggle
-net iface                   # Zephyr net shell: addresses, link
-net ping 192.168.1.10
+sb plca 1 8                          # unique node id per node (1..7 here)
+sb name kitchen                      # MQTT topics + hostname; reboot to apply
+sb mqtt mqtt://192.168.1.10:1883 user pass   # Mosquitto on the QNAP ("sb mqtt off")
+sb map 0 0                           # key 0 drives output 0 locally (-1 = events only)
+sb out 0 128
+matter onboardingcodes ble           # QR / manual pairing code
 ```
 
-`<name>-<mac>.local` is announced over mDNS. Button 4 held for 5 s does a
-factory reset.
+### 3. Matter
 
-### 3. MQTT / Home Assistant
+Commission over BLE from the Home Assistant app, Apple Home or Google Home
+using the onboarding code. The node stays on Ethernet afterwards; BLE is freed.
+Dev builds use Espressif's **test** DAC, so ecosystems show an "uncertified
+device" warning.
 
-Mosquitto (e.g. Container Station on the QNAP) plus the HA MQTT integration.
-Entities show up automatically through discovery. Manual test:
+### 4. MQTT / Home Assistant
+
+Entities appear through discovery: lights (outputs), switches (key LEDs),
+events (keys), sensors. Manual test:
 
 ```bash
 mosquitto_sub -h <broker> -t 'switchboard/#' -v
-mosquitto_pub -h <broker> -t switchboard/kitchen-board/ch/0/set -m ON
+mosquitto_pub -h <broker> -t switchboard/kitchen/out/0/set -m '{"state":"ON","brightness":200}'
 ```
 
-## DFU
-
-MCUboot + mcumgr SMP over the shell UART (`CONFIG_MCUMGR_TRANSPORT_SHELL`):
-
-```bash
-mcumgr --conntype serial --connstring /dev/ttyACM0,baud=115200 image upload build/app/zephyr/zephyr.signed.bin
-mcumgr --conntype serial --connstring /dev/ttyACM0,baud=115200 image list
-mcumgr --conntype serial --connstring /dev/ttyACM0,baud=115200 reset
-```
-
-SMP over UDP (network DFU) is planned for phase 1.1.
+Use **one** path per entity in HA (Matter *or* MQTT) to avoid duplicate
+entities. Both stay in sync on the device, so mixing works.
 
 ## Verification status
 
-**Not yet compiled.** No full NCS build was possible in the environment this
-scaffold was written in. What was checked against the NCS v3.3.0 sources
-(`sdk-zephyr@ncs-v3.3.0`):
+**Not compiled and not run.** ESP-IDF and the component registry weren't
+available in the environment this was written in. What was checked:
 
-* every Zephyr API used (net_mgmt Ethernet/T1S requests, conn_mgr, MQTT, hwinfo,
-  hostname, settings, GPIO) exists with the signature used
-* every `CONFIG_` symbol in `prj.conf` and the overlays exists
-* the LAN865x/MDIO/T1S-PHY devicetree layout matches the binding in that tree.
-  Upstream Zephyr 4.4 changes it: `phy-handle` becomes mandatory, and the MAC
-  address moves to an nvmem-layout node. Update the overlay when moving past
-  NCS v3.3.
+* the hook patch applies cleanly to the pinned connectedhomeip `0998b87db7`
+* esp-matter 1.6.1 APIs used (endpoint/cluster configs, switch events, attribute
+  update, console) against the release branch sources
+* LAN865x / PLCA ioctls against `espressif/esp-eth-drivers`
+* ESP-IDF v6.0.2 Ethernet/netif/MAC APIs, esp-mqtt config fields, led_strip 3.x
+* every `CONFIG_` symbol in `sdkconfig.defaults` that comes from the chip /
+  esp_matter / esp_eth / lwIP Kconfig files exists
 
-Expect a round of small compile fixes on the first `west build`.
+Expect a round of small fixes on the first `idf.py build`.

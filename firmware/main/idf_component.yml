@@ -1,0 +1,7 @@
+# esp_matter itself comes from ${ESP_MATTER_PATH}/components (EXTRA_COMPONENT_DIRS
+# in the top-level CMakeLists), i.e. the locally patched checkout.
+dependencies:
+  idf: ">=6.0"
+  espressif/lan865x: "^0.2.0"     # LAN8650/1 MAC-PHY (pulls lan86xx_common)
+  espressif/mqtt: "^1.1.0"        # moved out of ESP-IDF in v6.0
+  espressif/led_strip: "^3.1.0"   # WS2812 indicator chain
