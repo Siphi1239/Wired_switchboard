@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: Apache-2.0
+mainmenu "Wired Switchboard"
+
+menu "Wired Switchboard application"
+
+config APP_DEVICE_NAME_DEFAULT
+	string "Default device name (used for MQTT topics / HA discovery)"
+	default "switchboard"
+
+config APP_STATE_RESTORE
+	bool "Restore channel states after power loss"
+	default y
+	help
+	  Channel states are written to NVS (debounced) and restored at boot.
+	  Useful because PoDL supply interruptions are a normal event on a
+	  shared bus segment.
+
+config APP_STATE_SAVE_DELAY_MS
+	int "Debounce before persisting channel state"
+	default 2000
+	help
+	  Limits flash wear when a channel is toggled repeatedly.
+
+config APP_SHELL
+	bool "Provisioning shell commands (sb ...)"
+	default y
+	depends on SHELL
+
+menu "10BASE-T1S / PLCA defaults"
+
+config APP_PLCA_NODE_ID_DEFAULT
+	int "Default PLCA node ID (0 = coordinator, 255 = PLCA disabled/CSMA-CD)"
+	range 0 255
+	default 1
+
+config APP_PLCA_NODE_COUNT_DEFAULT
+	int "Default PLCA node count (only relevant for the coordinator)"
+	range 1 255
+	default 8
+
+config APP_PLCA_BURST_COUNT
+	int "PLCA burst count"
+	range 0 255
+	default 0
+
+config APP_PLCA_BURST_TIMER
+	int "PLCA burst timer [bit times]"
+	range 0 255
+	default 128
+
+config APP_PLCA_TO_TIMER
+	int "PLCA transmit opportunity timer [bit times]"
+	range 0 255
+	default 32
+
+endmenu
+
+menuconfig APP_MQTT
+	bool "MQTT front-end (Home Assistant discovery)"
+	default y
+	depends on MQTT_LIB
+
+if APP_MQTT
+
+config APP_MQTT_BROKER_DEFAULT
+	string "Default MQTT broker host name or IP"
+	default "mqtt.local"
+
+config APP_MQTT_PORT_DEFAULT
+	int "Default MQTT broker port"
+	default 1883
+
+config APP_MQTT_TOPIC_PREFIX
+	string "Topic prefix"
+	default "switchboard"
+
+config APP_MQTT_HA_DISCOVERY
+	bool "Publish Home Assistant MQTT discovery messages"
+	default y
+
+config APP_MQTT_HA_DISCOVERY_PREFIX
+	string "Home Assistant discovery prefix"
+	default "homeassistant"
+	depends on APP_MQTT_HA_DISCOVERY
+
+config APP_MQTT_KEEPALIVE_S
+	int "MQTT keep-alive [s]"
+	default 60
+
+config APP_MQTT_THREAD_STACK_SIZE
+	int "MQTT thread stack size"
+	default 3072
+
+config APP_MQTT_THREAD_PRIO
+	int "MQTT thread priority"
+	default 7
+
+endif # APP_MQTT
+
+module = APP
+module-str = Wired Switchboard
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
+
+source "Kconfig.zephyr"
