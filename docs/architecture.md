@@ -6,11 +6,11 @@ single-pair Ethernet, **powered over the data line**, with **Matter** and
 
 Per node:
 
-* up to 4 **keys** (momentary wall switches) → Matter Generic Switch events, MQTT
+* **2 keys** by default, up to 4 (momentary wall switches) → Matter Generic Switch events, MQTT
   events, and local control of outputs
 * up to 4 **low-voltage PWM outputs** (MOSFET, 12/24 V LED strips) → Matter
   Dimmable Light, HA MQTT light
-* up to 8 **indicator LEDs** (WS2812 chain, one per key) → follow their output or
+* one **indicator LED** per key (WS2812 on the DevKit, TI LP5012 on the custom board) → follow their output or
   are driven remotely
 * **SHT4x** temperature / humidity → Matter sensors, HA MQTT sensors
 
@@ -106,15 +106,15 @@ Local toggling happens on *release*, so it isn't delayed by the multi-press
 window. For a double press, that means the output toggles first and then goes
 to 100 %.
 
-### Matter endpoints (4 keys / 4 outputs / 4 LEDs / sensor)
+### Matter endpoints (default: 2 keys / 4 outputs / 2 LEDs / sensor)
 
 | EP | Device type | Purpose |
 |---|---|---|
 | 0 | Root Node | Ethernet network commissioning, OTA requestor |
-| 1–4 | Generic Switch | keys |
-| 5–8 | Dimmable Light | outputs |
-| 9–12 | On/Off Light | key LEDs (when not in "follow" mode) |
-| 13, 14 | Temperature, Humidity Sensor | SHT4x (only if detected) |
+| 1–2 | Generic Switch | keys |
+| 3–6 | Dimmable Light | outputs (2 A each; outputs 3–4 remote-only with 2 keys) |
+| 7–8 | On/Off Light | key LEDs (when not in "follow" mode) |
+| 9, 10 | Temperature, Humidity Sensor | SHT4x (only if detected) |
 
 ### MQTT topics
 

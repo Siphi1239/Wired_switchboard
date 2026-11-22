@@ -99,14 +99,14 @@ distribution board.
 | T1S coupling (BIN) | CMC **TDK ACT1210D-131-2P** + 2 × 0.1 µF series caps, rated **≥ 50 V** (100 V preferred) | as on Microchip EVB-LAN8651 (AN1848 Fig. 6-2). At 24 V PoDL the series caps see the full bus voltage. |
 | Termination | 2 × 49.9 Ω + 2 × 0.22 µF / 100 V, jumper-selectable | the EVB-LAN8651 BIN (AN1848 Fig. 6-2) uses this AC-coupled split termination on jumpers; populate on end nodes only |
 | PoDL decoupling | **47 µH differential-mode choke** (DMC), or 47–68 µH coupled inductor (e.g. Coilcraft LPD5030-473 as in AN1848) | AN1848: DMC gives the best noise margin, uncoupled single inductors the worst. Needs matched values, a guaranteed minimum L (±20 % parts) and I_sat well above node current + inrush. At ~25 mA per node (0.5 W at 24 V) a small DMC (AN1848: 300 mA I_sat, 806 mΩ) is enough. |
-| Input protection / inrush | **TI TPS2660** eFuse (4.2–55 V, reverse polarity, adjustable current limit and dV/dt) | soft-start keeps hot-plugging from disturbing the bus. Bulk capacitance (AN1848 PD: 470 µF / 35 V) goes **behind** the eFuse, rated ≥ 35 V for a 24 V bus. |
+| Input protection / inrush | **TI TPS2660** eFuse (4.2–55 V, reverse polarity, adjustable current limit and dV/dt), **current limit set to 100 mA** | soft-start keeps hot-plugging from disturbing the bus. Bulk capacitance (AN1848 PD: 470 µF / 35 V) goes **behind** the eFuse, rated ≥ 35 V for a 24 V bus. |
 | Buck input filter | LC / π filter between eFuse and buck | AN1848 §6.3: extra noise on the PoDL setup was likely from the DC/DC with only 1 µF input filtering |
 | 3.3 V | **TI LMR36006** (60 V, 0.6 A buck) | 60 V rating gives surge margin on a 24 V bus. Load ≈ 120 mA peak. |
 | Gate supply | 12 V LDO from the **load** supply | outputs can only switch when the load supply is present |
 | Gate drivers | **2 × TI UCC27524A** (dual low-side) | see "PWM switching" below |
-| Output switches | 4 × N-MOSFET, 40 V, R_DS(on) < 15 mΩ, in 3 × 3 mm packages | low-side switching (common-anode LED strips) |
-| Output protection | fuse on load input + per-channel current sense (shunt + comparator, or ADC) | short-circuit shutdown in firmware or hardware |
-| Bus / load terminals | push-in PCB terminals: bus for 0.2–0.8 mm solid (J-Y(St)Y), load for 1.5 mm² | 4 bus terminals (in/out) + 2 load-in + 4 outputs + 1–2 COM+ |
+| Output switches | 4 × N-MOSFET, 40 V, R_DS(on) < 15 mΩ at V_GS = 10 V, I_D ≥ 10 A, 3 × 3 mm packages | **2 A per output**; low-side switching (common-anode LED strips). Conduction loss 2² · 15 mΩ = 60 mW per channel. |
+| Output protection | 10 A fuse on the load input + per-channel current sense (10 mΩ shunt + comparator, trip ≈ 3 A) | 4 × 2 A = 8 A worst case per node; hardware trip on short circuit, firmware reports it |
+| Bus / load terminals | push-in PCB terminals: bus for 0.2–0.8 mm solid (J-Y(St)Y), load for 1.5 mm², ≥ 10 A | 4 bus (in/out) + 2 load-in + 4 outputs + **2 × COM+** (shares the up to 8 A return to the strips). 1.5 mm² copper and 2 A per strip keep wiring losses low. |
 
 ### PWM switching: why gate drivers
 
@@ -121,8 +121,20 @@ are not too fast also keep EMI off the T1S pair running in the same box.
 Alternative without drivers: drop the PWM to ~2–4 kHz (`CONFIG_OUTPUT_PWM_FREQ_HZ`).
 That's still flicker-free to the eye, but can show banding on camera.
 
-Target heat budget for the whole node: **< 1.5 W** (electronics ≈ 0.5 W +
-conduction and switching losses).
+Heat budget at full load (4 × 2 A, PWM active):
+
+| Source | Loss |
+|---|---|
+| Electronics from PoDL (≈ 0.5 W nominal, 2.4 W max at 100 mA) | 0.5 W |
+| MOSFET conduction, 4 × 60 mW | 0.24 W |
+| MOSFET switching with gate drivers, 4 × ≈ 0.2 W | 0.8 W |
+| Shunts, 4 × 2² · 10 mΩ | 0.16 W |
+| **Total** | **≈ 1.7 W** |
+
+That's acceptable for a 61 mm box, but it's the worst case (every channel
+PWM-dimmed at 2 A). At 100 % duty, switching losses vanish (≈ 0.9 W total).
+If the thermal test shows > 40 K rise, lower the PWM to ~8 kHz, which halves
+the switching loss.
 
 ### Grounding
 
@@ -170,18 +182,24 @@ DC/DC input. Simulate the segment (Microchip used Keysight ADS; the AN shows
 simulation was slightly pessimistic vs measurement) and check the 15 ns jitter
 limit with alien noise.
 
-**PSE (at the bridge):** 24 V SELV PSU → current limit / eFuse ≈ 0.5 A →
-LC filter for PSU ripple → 47 µH coupled inductor (≥ 1 A) → bus.
+**Power budget:** 100 mA per node at 24 V = 2.4 W max per node (nominal
+≈ 0.5 W leaves headroom for a presence sensor or brighter LEDs). 8 nodes →
+0.8 A max on the segment. Per-node decoupling choke I_sat ≥ 300 mA.
 
-## 4. Front board (46 × 46 mm, 2 layers)
+**PSE (at the bridge):** 24 V SELV PSU (≥ 30 W) → eFuse with current limit
+≈ 1 A → LC filter for PSU ripple → 47 µH coupled inductor rated ≥ 1.44 A (as in
+AN1848) → bus. Voltage drop at 0.8 A over 25 m of 0.8 mm cable ≈ 1.4 V
+(worst case, all load at the far end), so the farthest node still sees ≥ 22 V.
+
+## 4. Front board (46 × 46 mm, 2 layers): 2-key variant
 
 | Function | Candidate | Notes |
 |---|---|---|
-| Keys | 4 × right-angle or top tact switches, long life (≥ 1 M cycles) | rocker caps press on them; a 2-key version uses 2 rockers × up/down |
-| Key LEDs | 4 × RGB LED + **TI LP5012** I2C RGB driver (12 ch, 4 RGB) | runs at 3.3 V, unlike WS2812 (≥ 3.5–5 V). Shares the I2C bus with the sensor. Light pipes in the caps. |
+| Keys | **2** × tact switches, long life (≥ 1 M cycles) | two side-by-side caps (each ≈ 22 × 46 mm); the switch sits in the centre of each cap with a pivot at the frame edge |
+| Key LEDs | 2 × RGB LED + **TI LP5012** I2C RGB driver (12 ch, 4 RGB, 2 spare for a status LED) | runs at 3.3 V, unlike WS2812 (≥ 3.5–5 V). Shares the I2C bus with the sensor. Light pipes in the caps. |
 | Sensor | **Sensirion SHT45** (or SHT40) | thermal slot in the PCB around it, vent slots in the caps, away from the LED driver |
 | Optional | ambient light sensor (auto LED brightness), PIR/radar presence | later front-board variants |
-| B2B | 2 × 6, 1.27 mm | 3V3, GND, KEY0–3, SDA, SCL, LP5012 EN, spare |
+| B2B | 2 × 6, 1.27 mm | 3V3, GND, KEY0–1, SDA, SCL, LP5012 EN, spares (kept so a 4-key front board fits the same base) |
 
 Firmware impact: replace `indicators.c` (WS2812/RMT) with an LP5012 driver.
 Keys, sensor and the rest stay unchanged. The pin map moves to the custom
@@ -217,13 +235,11 @@ rooms where you want a specific switch range.
 
 ## 7. Open points before layout
 
-1. **Bus voltage**: 24 V confirmed (see "PoDL at 24 V"). Remaining: PoDL
-   current limit per node, proposal ≤ 100 mA (0.5 W nominal, inrush-limited),
-   and the PSE current limit (≈ 0.5 A for 8 nodes).
-2. **Load current per output** (sets MOSFETs, terminals, fuse, heat): proposal
-   ≤ 2 A per channel, ≤ 4 A total per node.
+1. ~~Bus voltage~~: **24 V**, **100 mA per node**, PSE limit ≈ 1 A for 8 nodes.
+2. ~~Load current~~: **2 A per output**, 8 A worst case per node (10 A fuse).
 3. **Cable**: J-Y(St)Y 2×2×0.8 with one pair for T1S + PoDL. The second pair is
    only good for small loads (≈ 0.7 Ω loop resistance at 10 m).
-4. **Key layout**: 1, 2 or 4 rockers, which decides the front-board variants.
+4. ~~Key layout~~: **2 keys**. The base board keeps 4 key inputs and 4 outputs, so
+   outputs 3–4 are remote-only (Matter/MQTT) unless a 4-key front is fitted.
 5. **Enclosure for the caps**: 3D-printed first, then compatible with a
    chosen 50 × 50 / 55 × 55 frame system.

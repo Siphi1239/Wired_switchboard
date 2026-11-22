@@ -53,7 +53,7 @@ menu "Wired Switchboard"
         config KEY_COUNT
             int "Number of keys"
             range 0 4
-            default 4
+            default 2
         config KEY_GPIO_0
             int "Key 0 GPIO"
             default 0
@@ -116,7 +116,7 @@ menu "Wired Switchboard"
         config INDICATOR_COUNT
             int "Number of indicator LEDs"
             range 0 8
-            default 4
+            default 2
         config INDICATOR_GPIO
             int "Data GPIO"
             default 8
