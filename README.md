@@ -30,7 +30,8 @@ firmware/
     mqtt_app.*        esp-mqtt, HA discovery, JSON commands
     inputs.*          key scan, Matter momentary-switch event model
     outputs.*         LEDC PWM with gamma + fades
-    indicators.*      WS2812 key LEDs
+    indicators.*      key LEDs: LP5012 (rev A) or WS2812 (DevKit)
+    i2c_bus.*         shared I2C bus (LP5012, SHT45)
     sensors.*         SHT4x
     local_control.*   offline key -> output logic, LED follow
     app_settings.*    NVS config        app_console.c   `sb` commands
@@ -75,6 +76,18 @@ idf.py -p /dev/ttyACM0 flash monitor
 ```
 
 The DevKit's USB port is the console (USB-Serial-JTAG).
+
+### Rev A base board
+
+```bash
+idf.py -B build-reva -D SDKCONFIG=build-reva/sdkconfig \
+       -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.board.reva" build
+idf.py -B build-reva -p /dev/ttyUSB0 flash monitor    # UART0 via Tag-Connect
+```
+
+This selects the rev A pin map, the LP5012 indicator driver and the UART
+console. Keep separate build directories per board, because Kconfig pin
+defaults only apply to a fresh sdkconfig.
 
 ## Bring-up
 

@@ -41,9 +41,7 @@ static key_ctx_t s_keys[DM_MAX_KEYS];
 static uint8_t s_n;
 static esp_timer_handle_t s_timer;
 static inputs_factory_reset_cb_t s_reset_cb;
-#if CONFIG_KEY_FACTORY_RESET_GPIO >= 0
 static int64_t s_reset_pressed_since = -1;
-#endif
 
 static const int s_gpios[DM_MAX_KEYS] = {
     CONFIG_KEY_GPIO_0, CONFIG_KEY_GPIO_1, CONFIG_KEY_GPIO_2, CONFIG_KEY_GPIO_3,
@@ -122,7 +120,12 @@ static void sample_cb(void *arg)
     }
 
 #if CONFIG_KEY_FACTORY_RESET_GPIO >= 0
-    if (gpio_get_level(CONFIG_KEY_FACTORY_RESET_GPIO) == 0) {
+    bool reset_held = gpio_get_level(CONFIG_KEY_FACTORY_RESET_GPIO) == 0;
+#else
+    /* No dedicated button (rev A): keys 0 and 1 held together. */
+    bool reset_held = s_n >= 2 && s_keys[0].stable && s_keys[1].stable;
+#endif
+    if (reset_held) {
         if (s_reset_pressed_since < 0) {
             s_reset_pressed_since = now;
         } else if (now - s_reset_pressed_since >= FACTORY_RESET_MS && s_reset_cb) {
@@ -133,7 +136,6 @@ static void sample_cb(void *arg)
     } else {
         s_reset_pressed_since = -1;
     }
-#endif
 }
 
 esp_err_t inputs_init(inputs_factory_reset_cb_t on_factory_reset)

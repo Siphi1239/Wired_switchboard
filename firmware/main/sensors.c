@@ -9,7 +9,7 @@
 #include "sensors.h"
 #include "device_model.h"
 
-#include "driver/i2c_master.h"
+#include "i2c_bus.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -82,15 +82,8 @@ static void sensor_task(void *arg)
 esp_err_t sensors_init(void)
 {
     i2c_master_bus_handle_t bus;
-    const i2c_master_bus_config_t bcfg = {
-        .i2c_port = -1,
-        .sda_io_num = CONFIG_SENSOR_I2C_SDA,
-        .scl_io_num = CONFIG_SENSOR_I2C_SCL,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,   /* fit 4.7k externals on real hw */
-    };
-    ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bcfg, &bus), TAG, "i2c bus");
+
+    ESP_RETURN_ON_ERROR(i2c_bus_get(&bus), TAG, "i2c bus");
 
     if (i2c_master_probe(bus, SHT4X_ADDR, I2C_TIMEOUT_MS) != ESP_OK) {
         ESP_LOGW(TAG, "no SHT4x at 0x%02x - sensor endpoints disabled", SHT4X_ADDR);
@@ -99,7 +92,7 @@ esp_err_t sensors_init(void)
     const i2c_device_config_t dcfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = SHT4X_ADDR,
-        .scl_speed_hz = 100000,
+        .scl_speed_hz = CONFIG_BOARD_I2C_FREQ_HZ,
     };
     ESP_RETURN_ON_ERROR(i2c_master_bus_add_device(bus, &dcfg, &s_dev), TAG, "add dev");
     s_present = true;

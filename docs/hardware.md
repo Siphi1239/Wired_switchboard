@@ -112,6 +112,32 @@ distribution board.
 | Output protection | 5 A fuse on the load input + per-channel current sense (10 mΩ shunt + comparator, trip ≈ 3 A) | 2 × 2 A = 4 A worst case per node; hardware trip on short circuit, firmware reports it |
 | Bus / load terminals | push-in PCB terminals: bus for 0.2–0.8 mm solid (J-Y(St)Y 1×2×0.8), load for 1.5 mm², ≥ 10 A | 4 bus (in/out) + 2 shield (in/out, joined) + 2 load-in + 2 outputs + 1 × COM+ (up to 4 A). 1.5 mm² copper and 2 A per strip keep wiring losses low. |
 
+### Pin map (rev A, ESP32-C6-WROOM-1-N8)
+
+Selected in firmware with `CONFIG_APP_BOARD_REVA` (`firmware/sdkconfig.board.reva`).
+
+| GPIO | Function | Notes |
+|---|---|---|
+| 0 | VBUS sense (ADC1) | divider 24 V → ≤ 2.5 V, e.g. 100 k / 10 k; for the planned `power_mon` |
+| 1 | variant-ID strap (ADC1) | 10 k to 3V3; bottom 0 Ω = keypad, 10 k = outputs fitted |
+| 2 | LAN8651 MISO (SDO) | |
+| 3 | LAN8651 RESET_N | |
+| 4, 5 | KEY0, KEY1 | via B2B; RC 1 k / 100 nF on the front board |
+| 6 | LAN8651 SCLK | |
+| 7 | LAN8651 MOSI (SDI) | |
+| 8 | LP5012 EN | strapping pin, must be high at boot: 10 k pull-up |
+| 9 | BOOT | strap only, pad + pull-up; factory reset = KEY0 + KEY1 held 10 s |
+| 10 | LAN8651 CS_N | |
+| 11 | LAN8651 IRQ_N | |
+| 12, 13 | USB D−/D+ | test pads only (USB-JTAG for lab debugging) |
+| 15 | OUT_FAULT_N | open-drain wired-OR of the current-sense comparators (output variant) |
+| 16, 17 | UART0 TX/RX | console + flashing via Tag-Connect TC2030 |
+| 18, 19 | OUT0, OUT1 PWM | to UCC27524A inputs; pull-downs so outputs stay off during boot |
+| 20, 21 | KEY2, KEY3 | spare, routed to B2B for a 4-key front |
+| 22, 23 | I2C SDA, SCL | B2B to front board (LP5012 @ 0x14, SHT45 @ 0x44); 2.2 k pull-ups on base |
+
+Board-to-board (2 × 6, 1.27 mm): 3V3, GND ×2, KEY0–3, SDA, SCL, LP5012_EN, 2 spare.
+
 ### PWM switching: why gate drivers
 
 The firmware PWMs at 19.5 kHz. A GPIO driving a MOSFET gate directly gives
@@ -204,10 +230,9 @@ AN1848) → bus. Voltage drop at 0.8 A over 25 m of 0.8 mm cable ≈ 1.4 V
 | Optional | ambient light sensor (auto LED brightness), PIR/radar presence | later front-board variants |
 | B2B | 2 × 6, 1.27 mm | 3V3, GND, KEY0–1, SDA, SCL, LP5012 EN, spares (kept so a 4-key front board fits the same base) |
 
-Firmware impact: replace `indicators.c` (WS2812/RMT) with an LP5012 driver.
-Keys, sensor and the rest stay unchanged. The pin map moves to the custom
-board (no USB-JTAG pins needed in the field; keep a 6-pin Tag-Connect pad for
-UART/boot).
+Firmware: `indicators.c` has an LP5012 backend (`CONFIG_INDICATOR_DRIVER_LP5012`,
+default on rev A); the WS2812 backend stays for the DevKit. The LP5012 and
+SHT45 share one I2C bus (`i2c_bus.c`).
 
 ## 5. Alternative: interface behind standard push-buttons
 

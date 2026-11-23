@@ -4,6 +4,19 @@ menu "Wired Switchboard"
         string "Default device name (MQTT topics, hostname)"
         default "switchboard"
 
+    choice APP_BOARD
+        prompt "Target board (sets pin defaults)"
+        default APP_BOARD_DEVKITC
+        help
+            Pin defaults are applied when a symbol is first set. After switching
+            boards, start from a fresh sdkconfig (delete it, or use
+            sdkconfig.board.reva, see README).
+        config APP_BOARD_DEVKITC
+            bool "ESP32-C6-DevKitC-1 + Two-Wire ETH Click (development)"
+        config APP_BOARD_REVA
+            bool "Wired Switchboard base board rev A (docs/hardware.md)"
+    endchoice
+
     menu "10BASE-T1S (LAN8651 on SPI)"
         config T1S_SPI_HOST
             int "SPI host (1 = SPI2)"
@@ -56,15 +69,19 @@ menu "Wired Switchboard"
             default 2
         config KEY_GPIO_0
             int "Key 0 GPIO"
+            default 4 if APP_BOARD_REVA
             default 0
         config KEY_GPIO_1
             int "Key 1 GPIO"
+            default 5 if APP_BOARD_REVA
             default 1
         config KEY_GPIO_2
             int "Key 2 GPIO"
+            default 20 if APP_BOARD_REVA
             default 4
         config KEY_GPIO_3
             int "Key 3 GPIO"
+            default 21 if APP_BOARD_REVA
             default 5
         config KEY_ACTIVE_LOW
             bool "Keys are active low (to GND, internal pull-up)"
@@ -80,7 +97,8 @@ menu "Wired Switchboard"
             range 2 4
             default 3
         config KEY_FACTORY_RESET_GPIO
-            int "Factory reset button GPIO (hold 10 s, -1 = none)"
+            int "Factory reset button GPIO (hold 10 s, -1 = keys 0+1 held 10 s)"
+            default -1 if APP_BOARD_REVA
             default 9
     endmenu
 
@@ -96,6 +114,7 @@ menu "Wired Switchboard"
                 this value.
         config BOARD_VARIANT_ADC_GPIO
             int "Variant-ID strap ADC GPIO (-1 = none, e.g. DevKit)"
+            default 1 if APP_BOARD_REVA
             default -1
             help
                 Divider on this pin: ~0 V = keypad variant (no outputs),
@@ -107,10 +126,10 @@ menu "Wired Switchboard"
             int "Output 1 GPIO"
             default 19
         config OUTPUT_GPIO_2
-            int "Output 2 GPIO"
+            int "Output 2 GPIO (not routed on rev A)"
             default 20
         config OUTPUT_GPIO_3
-            int "Output 3 GPIO"
+            int "Output 3 GPIO (not routed on rev A)"
             default 21
         config OUTPUT_PWM_FREQ_HZ
             int "PWM frequency [Hz]"
@@ -123,17 +142,52 @@ menu "Wired Switchboard"
             default 150
     endmenu
 
-    menu "Indicator LEDs (WS2812 chain)"
+    menu "Board I2C (sensor, LED driver)"
+        config BOARD_I2C_SDA
+            int "I2C SDA GPIO"
+            default 22
+        config BOARD_I2C_SCL
+            int "I2C SCL GPIO"
+            default 23
+        config BOARD_I2C_FREQ_HZ
+            int "I2C clock [Hz]"
+            default 400000
+    endmenu
+
+    menu "Indicator LEDs"
+        choice INDICATOR_DRIVER
+            prompt "Indicator LED driver"
+            default INDICATOR_DRIVER_LP5012 if APP_BOARD_REVA
+            default INDICATOR_DRIVER_WS2812
+            config INDICATOR_DRIVER_WS2812
+                bool "WS2812 chain (RMT), DevKit on-board LED"
+            config INDICATOR_DRIVER_LP5012
+                bool "TI LP5012 I2C RGB driver (front board)"
+        endchoice
         config INDICATOR_COUNT
             int "Number of indicator LEDs"
+            range 0 4 if INDICATOR_DRIVER_LP5012
             range 0 8
             default 2
         config INDICATOR_GPIO
-            int "Data GPIO"
+            int "WS2812 data GPIO"
             default 8
+            depends on INDICATOR_DRIVER_WS2812
             help
                 GPIO8 drives the on-board RGB LED of the ESP32-C6-DevKitC-1, so
                 indicator 0 is visible without extra hardware.
+        config LP5012_I2C_ADDR
+            hex "LP5012 I2C address (0x14 + ADDR1:ADDR0)"
+            range 0x14 0x17
+            default 0x14
+            depends on INDICATOR_DRIVER_LP5012
+        config LP5012_GPIO_EN
+            int "LP5012 EN GPIO (-1 = tied high)"
+            default 8
+            depends on INDICATOR_DRIVER_LP5012
+            help
+                GPIO8 is a strapping pin that must be high at boot. EN has a
+                pull-up on the board, so this is safe.
         config INDICATOR_BRIGHTNESS
             int "Brightness (0-255)"
             default 40
@@ -143,12 +197,6 @@ menu "Wired Switchboard"
         config SENSOR_SHT4X
             bool "SHT4x temperature / humidity sensor (I2C 0x44)"
             default y
-        config SENSOR_I2C_SDA
-            int "I2C SDA GPIO"
-            default 22
-        config SENSOR_I2C_SCL
-            int "I2C SCL GPIO"
-            default 23
         config SENSOR_PERIOD_S
             int "Sampling period [s]"
             default 30

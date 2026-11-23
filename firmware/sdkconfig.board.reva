@@ -1,0 +1,7 @@
+# Wired Switchboard base board rev A (docs/hardware.md, section "Pin map").
+# Build:  idf.py -B build-reva -D SDKCONFIG=build-reva/sdkconfig \
+#                -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.board.reva" build
+CONFIG_APP_BOARD_REVA=y
+CONFIG_INDICATOR_DRIVER_LP5012=y
+# Console on UART0 (Tag-Connect), USB is not routed to the field board.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
