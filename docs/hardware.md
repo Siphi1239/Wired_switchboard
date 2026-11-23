@@ -10,6 +10,7 @@ datasheet details before layout.
 
 ---
 
+KiCad projects: [`hardware/kicad/`](../hardware/kicad/README.md) (outlines, rules, fixed footprints, schematic sheets).
 BOM draft: [`hardware/bom-revA.csv`](../hardware/bom-revA.csv) (variant column: ALL, OUT = output option, END = end-node termination).
 
 ## 1. Concept: two-board stack

@@ -33,7 +33,7 @@ CX, CY = 100.0, 100.0          # board centre in KiCad coordinates [mm]
 DATE = "2026-11-23"
 
 # Shared mechanics (both boards, relative to the box axis) -------------------
-B2B_POS = (0.0, 6.0)           # 2x6 1.27 mm board-to-board, centre
+B2B_POS = (0.0, 8.5)           # 2x6 1.27 mm board-to-board, centre
 STANDOFF_POS = [(-18.0, 12.0), (18.0, 12.0)]       # M2 standoffs base <-> front
 FRONT_HOLES = [(-18.0, -12.0), (18.0, -12.0), (-18.0, 12.0), (18.0, 12.0)]
 
@@ -377,7 +377,7 @@ def build_base(pcbnew, board):
     circle(pcbnew, board, DWG, (0, 0), 30.5, 0.15)                 # box inner wall ~ D61
     for sx in (-30.0, 30.0):
         circle(pcbnew, board, DWG, (sx, 0), 3.5, 0.15)             # screw boss
-    text(pcbnew, board, DWG, (-12, -28.5), "BOX D61 / SCREW BOSSES @ +-30 mm", 0.8)
+    text(pcbnew, board, DWG, (0, 29.5), "BOX D61 / SCREW BOSSES @ +-30 mm", 0.8)
 
     # Mounting: M2 standoffs to the front board
     for i, p in enumerate(STANDOFF_POS):
@@ -392,7 +392,7 @@ def build_base(pcbnew, board):
             break
     u1 = footprint(pcbnew, board, module[0], module[1], "U1", "ESP32-C6-WROOM-1-N8", (0, -9.8))
     if module[1] != "ESP32-C6-WROOM-1":
-        text(pcbnew, board, CMT, (-12, 5), f"U1 placeholder {module[1]}: replace with ESP32-C6-WROOM-1 (25.5x18)", 0.6)
+        text(pcbnew, board, CMT, (0, 32), f"U1 = {module[1]} footprint as placeholder (same 18 x 25.5 outline): replace with ESP32-C6-WROOM-1", 0.6)
 
     # Antenna keep-out: module antenna end, all copper layers, to the board edge
     ant = [(-9.5, -25.5), (9.5, -25.5), (9.5, -16.0), (-9.5, -16.0)]
@@ -404,23 +404,25 @@ def build_base(pcbnew, board):
               "J4", "B2B 2x6 1.27", B2B_POS, rot=90)
 
     # Tag-Connect
-    if os.path.exists(os.path.join(FP_ROOT, "Connector.pretty", "Tag-Connect_TC2030-IDC-NL.kicad_mod")):
-        footprint(pcbnew, board, "Connector", "Tag-Connect_TC2030-IDC-NL", "J5", "TC2030", (-12.5, 14.0),
+    if os.path.exists(os.path.join(FP_ROOT, "Connector.pretty", "Tag-Connect_TC2030-IDC-NL_2x03_P1.27mm_Vertical.kicad_mod")):
+        footprint(pcbnew, board, "Connector", "Tag-Connect_TC2030-IDC-NL_2x03_P1.27mm_Vertical", "J5", "TC2030", (-9.0, 16.5),
                   back=True)
 
     # Placement zones (Cmts.User) - guidance for the layout
     zones = {
-        "T1S PHY + BIN (top)": [(-7, 9), (7, 9), (7, 20), (-7, 20)],
+        "T1S PHY + BIN (top)": [(-8, 13.5), (8, 13.5), (6, 21), (-6, 21)],
         "PoDL / eFuse / buck (top)": [(-22, -4), (-9.5, -4), (-9.5, 10), (-20, 10)],
         "OUTPUT_OPTION (top, DNP on keypad)": [(9.5, -4), (22, -4), (20, 10), (9.5, 10)],
     }
     for name, pts in zones.items():
         poly_outline(pcbnew, board, CMT, pts, 0.12)
-        text(pcbnew, board, CMT, (pts[0][0] + 0.5, pts[0][1] - 1.2), name, 0.6)
+        cx = sum(p[0] for p in pts) / len(pts)
+        cy = sum(p[1] for p in pts) / len(pts)
+        text(pcbnew, board, CMT, (cx, cy), name, 0.6)
     # Bottom side: terminals along the lower arc
     term = [(-20, 13), (20, 13), (14, 21), (-14, 21)]
     poly_outline(pcbnew, board, pcbnew.B_Fab, term, 0.12)
-    text(pcbnew, board, pcbnew.B_Fab, (-12, 12), "BOTTOM: J1 bus / J2 shield / J3 load push-in terminals", 0.6)
+    text(pcbnew, board, pcbnew.B_Fab, (0, 19.5), "BOTTOM: J1 bus / J2 shield / J3 load terminals", 0.6)
 
     text(pcbnew, board, pcbnew.F_SilkS, (0, 22.5), "WIRED SWITCHBOARD BASE rev A", 0.8)
     text(pcbnew, board, F_FAB, (0, 0), "+ box axis", 0.6)
@@ -437,7 +439,7 @@ def build_front(pcbnew, board):
     # SHT45 tongue at the bottom edge
     poly_outline(pcbnew, board, E, outline, 0.1)
     # U-slot 1 mm wide; the island stays attached by a 2 mm bridge along the bottom edge
-    slot = [(-4.0, 21.0), (-4.0, 13.0), (4.0, 13.0), (4.0, 21.0), (3.0, 21.0), (3.0, 14.0), (-3.0, 14.0),
+    slot = [(-4.0, 21.0), (-4.0, 14.0), (4.0, 14.0), (4.0, 21.0), (3.0, 21.0), (3.0, 15.0), (-3.0, 15.0),
             (-3.0, 21.0)]
     poly_outline(pcbnew, board, E, slot, 0.1)
 
@@ -451,13 +453,13 @@ def build_front(pcbnew, board):
         footprint(pcbnew, board, "MountingHole", "MountingHole_2.2mm_M2", f"H{i + 1}", "M2", p)
 
     for ref, x in (("SW1", -11.5), ("SW2", 11.5)):
-        footprint(pcbnew, board, "Button_Switch_SMD", "SW_SPST_PTS645Sx43SMTR", ref, "Tact >= 1M cycles",
+        footprint(pcbnew, board, "Button_Switch_SMD", "SW_SPST_PTS645", ref, "Tact >= 1M cycles",
                   (x, 0.0))
     for ref, x in (("LED1", -11.5), ("LED2", 11.5)):
         footprint(pcbnew, board, "LED_SMD", "LED_RGB_PLCC-6", ref, "RGB", (x, -7.0))
-    footprint(pcbnew, board, "Sensor_Humidity", "Sensirion_DFN-4-1EP_2x2mm_P1mm_EP0.7x1.6mm", "U11", "SHT45",
-              (0.0, 17.5))
-    rule_area(pcbnew, board, "SENSOR_ISLAND", [(-3.0, 14.0), (3.0, 14.0), (3.0, 21.0), (-3.0, 21.0)],
+    footprint(pcbnew, board, "Sensor_Humidity", "Sensirion_DFN-4_1.5x1.5mm_P0.8mm_SHT4x_NoCentralPad", "U11", "SHT45",
+              (0.0, 18.0))
+    rule_area(pcbnew, board, "SENSOR_ISLAND", [(-3.0, 15.0), (3.0, 15.0), (3.0, 21.0), (-3.0, 21.0)],
               [pcbnew.F_Cu, pcbnew.B_Cu], no_copper=False)
     # B2B socket on the bottom side, coaxial with base J4
     footprint(pcbnew, board, "Connector_PinSocket_1.27mm", "PinSocket_2x06_P1.27mm_Vertical_SMD", "J6",

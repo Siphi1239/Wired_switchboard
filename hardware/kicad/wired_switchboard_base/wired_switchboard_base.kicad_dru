@@ -1,0 +1,23 @@
+(version 1)
+# Wired Switchboard rev A - custom design rules (KiCad >= 7)
+
+(rule "24V creepage on outer layers"
+  (condition "A.NetClass == 'BUS_24V' && B.NetClass != 'BUS_24V'")
+  (constraint clearance (min 0.3mm)))
+
+(rule "Load current tracks"
+  (condition "A.NetClass == 'LOAD_2A'")
+  (constraint track_width (min 1.0mm) (opt 2.0mm)))
+
+(rule "No copper under the ESP32-C6 antenna"
+  (condition "A.insideArea('ANTENNA_KEEPOUT')")
+  (constraint disallow track via zone))
+
+(rule "T1S pair symmetric"
+  (condition "A.NetClass == 'T1S'")
+  (constraint diff_pair_uncoupled (max 3mm))
+  (constraint skew (max 0.5mm)))
+
+(rule "Thermal slot around SHT45"
+  (condition "A.insideArea('SENSOR_ISLAND')")
+  (constraint disallow zone))
