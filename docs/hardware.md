@@ -2,7 +2,8 @@
 
 Target: fits a standard **Ø 68 mm flush-mount box** (DIN 49073 "Gerätedose"),
 behind a standard **71 × 71 mm frame / 60 mm screw spacing** (DIN 49075), so
-commercial switch frames (Gira, Jung, Busch-Jaeger, Berker…) can be used.
+commercial switch frames can be used. Key caps follow the **55 × 55 mm** central-insert
+format (e.g. Gira System 55 and other "55" ranges).
 
 Status: concept. All part numbers are **candidates**; check availability and
 datasheet details before layout.
@@ -109,7 +110,7 @@ distribution board.
 | Gate drivers | **1 × TI UCC27524A** (dual low-side) | see "PWM switching" below |
 | Output switches | 2 × N-MOSFET, 40 V, R_DS(on) < 15 mΩ at V_GS = 10 V, I_D ≥ 10 A, 3 × 3 mm packages | **2 A per output**; low-side switching (common-anode LED strips). Conduction loss 2² · 15 mΩ = 60 mW per channel. |
 | Output protection | 5 A fuse on the load input + per-channel current sense (10 mΩ shunt + comparator, trip ≈ 3 A) | 2 × 2 A = 4 A worst case per node; hardware trip on short circuit, firmware reports it |
-| Bus / load terminals | push-in PCB terminals: bus for 0.2–0.8 mm solid (J-Y(St)Y), load for 1.5 mm², ≥ 10 A | 4 bus (in/out) + 2 load-in + 2 outputs + 1 × COM+ (up to 4 A). 1.5 mm² copper and 2 A per strip keep wiring losses low. |
+| Bus / load terminals | push-in PCB terminals: bus for 0.2–0.8 mm solid (J-Y(St)Y 1×2×0.8), load for 1.5 mm², ≥ 10 A | 4 bus (in/out) + 2 shield (in/out, joined) + 2 load-in + 2 outputs + 1 × COM+ (up to 4 A). 1.5 mm² copper and 2 A per strip keep wiring losses low. |
 
 ### PWM switching: why gate drivers
 
@@ -197,7 +198,7 @@ AN1848) → bus. Voltage drop at 0.8 A over 25 m of 0.8 mm cable ≈ 1.4 V
 
 | Function | Candidate | Notes |
 |---|---|---|
-| Keys | **2** × tact switches, long life (≥ 1 M cycles) | two side-by-side caps (each ≈ 22 × 46 mm); the switch sits in the centre of each cap with a pivot at the frame edge |
+| Keys | **2** × tact switches, long life (≥ 1 M cycles) | two side-by-side caps, each ≈ 27 × 55 mm (55 × 55 insert split in half); the switch sits in the centre of each cap with a pivot at the frame edge |
 | Key LEDs | 2 × RGB LED + **TI LP5012** I2C RGB driver (12 ch, 4 RGB, 2 spare for a status LED) | runs at 3.3 V, unlike WS2812 (≥ 3.5–5 V). Shares the I2C bus with the sensor. Light pipes in the caps. |
 | Sensor | **Sensirion SHT45** (or SHT40) | thermal slot in the PCB around it, vent slots in the caps, away from the LED driver |
 | Optional | ambient light sensor (auto LED brightness), PIR/radar presence | later front-board variants |
@@ -252,9 +253,38 @@ shunts) sits in one PCB area, so DNP leaves no dead copper in the way.
 
 1. ~~Bus voltage~~: **24 V**, **100 mA per node**, PSE limit ≈ 1 A for 8 nodes.
 2. ~~Load current~~: **2 A per output**, **2 optional outputs**, 4 A worst case per node (5 A fuse).
-3. **Cable**: J-Y(St)Y 2×2×0.8 with one pair for T1S + PoDL. The second pair is
-   only good for small loads (≈ 0.7 Ω loop resistance at 10 m).
+3. ~~Cable~~: **J-Y(St)Y 1×2×0.8** is enough, see "Bus cable" below.
 4. ~~Key layout~~: **2 keys**, key n drives output n locally when fitted. The base
    board keeps 4 key inputs (spare B2B pins) for a later 4-key front.
-5. **Enclosure for the caps**: 3D-printed first, then compatible with a
-   chosen 50 × 50 / 55 × 55 frame system.
+5. ~~Frame~~: **55 × 55 mm** inserts; caps 3D-printed first.
+
+## 8. Bus cable
+
+**1×2×0.8 is sufficient.** 10BASE-T1S carries data and PoDL on a single
+twisted pair, so a second pair adds nothing to the bus.
+
+| Check | 1×2×0.8 |
+|---|---|
+| Data | one pair is the whole T1S medium |
+| Power | 0.8 A segment max (8 × 100 mA) over 0.5 mm² conductors: ≈ 1.4 V drop at 25 m, worst case |
+| Load power | must not go over this cable anyway: 2 × 2 A per node needs its own 1.5 mm² supply |
+
+Notes:
+
+* **Impedance:** J-Y(St)Y is telephone cable, not specified as a data
+  cable. T1S expects ≈ 100 Ω differential. The 2×2 version is a **star
+  quad**, whose pairs (diagonal conductors) have a less defined impedance
+  than a true twisted pair, which is another point in favour of 1×2.
+  Microchip's AN1848 used plain 22 AWG twisted pair, so validate the real
+  installation: eye diagram on the farthest node with all nodes connected.
+  If margins are thin, the fallback is a dedicated SPE cable (1 × 2 × AWG22,
+  100 Ω).
+* **Shield:** carry it through every box (in/out terminals joined on the
+  board, not connected to the node's ground). Ground it at the PSE end only,
+  directly or via an RC (e.g. 1 MΩ ∥ 4.7 nF).
+* **Loop-through wiring:** each box has an incoming and an outgoing cable,
+  so plan two cable entries per box. A spare pair can't replace that,
+  because a multidrop stub must stay < 10 cm.
+* A second pair would only be useful as a reserve (e.g. a later second
+  segment). Pulling a draw wire or using conduit ("Leerrohr") covers that
+  more flexibly.
