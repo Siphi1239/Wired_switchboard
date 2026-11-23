@@ -77,9 +77,10 @@ board-to-board pair J4/J6 and the M2 standoffs line up by construction.
   check the EP size), TPS2660, LMR36006, LP5012 and the push-in terminals
   (WAGO 2060 or similar). Check the KiCad libraries first, then put the rest in
   a project library.
-* **Placement density** on the base is tight: PoDL + power left of the module,
-  the output block right of it, T1S PHY near the terminals. The bottom side
-  outside the terminal area is available for passives.
+* **Both sides are populated** (hand-assembled samples): base top = module,
+  T1S PHY, logic; base bottom = terminals, bulk cap, PoDL choke, output block,
+  passives. Height limits per side and the soldering order are in
+  `docs/hardware.md` ("Double-sided assembly").
 
 Regenerate with `/usr/bin/python3 hardware/kicad/generate.py` (needs KiCad's `pcbnew` Python module). It overwrites
 the projects, so stop using it once capture starts in KiCad.

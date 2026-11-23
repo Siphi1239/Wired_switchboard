@@ -267,6 +267,39 @@ shunts) sits in one PCB area, so DNP leaves no dead copper in the way.
 10 k / 10 k) is read at boot. One firmware image serves both variants. The
 `sb outputs` console setting overrides it for the DevKit.
 
+### Double-sided assembly (hand-assembled samples)
+
+The samples are hand-assembled, so **both sides of both boards may carry
+parts**. That relieves the base board: the module side keeps the RF/T1S
+parts, the box-floor side takes power and bulky passives.
+
+**Height budget per side**
+
+| Side | Max. height | Typical parts |
+|---|---|---|
+| Base top (towards front board) | **5 mm** | U1 module (3.2), LAN8651 + BIN, eFuse, buck, LP inductors ≤ 5 mm |
+| Base bottom (towards box floor) | **8 mm**, terminals ~11 mm | push-in terminals, C5 bulk (6.3 × 7.7), PoDL choke, output block, passives |
+| Front bottom (towards base) | **1.5 mm**, except J6 | passives, LP5012 decoupling, key RC |
+| Front top (under caps) | **4 mm** | tact switches, LEDs, LP5012, SHT45 |
+
+Base top + front bottom must stay ≤ 7 mm at any point (8 mm board-to-board
+stack, 1 mm air). Keep the antenna keep-out empty on **both** sides.
+
+**Soldering order** (hot plate / hot air, no oven):
+1. **Base top** first with SAC305 paste (module, LAN8651 QFN, fine-pitch
+   parts). Inspect the QFN exposed pads before continuing.
+2. **Base bottom** second with **low-temperature SnBi paste (138 °C)**, so the
+   top side does not reflow again. The heavy parts (terminals, bulk cap,
+   inductors) go here. Or solder them by hand last.
+3. **Front board**: top (LP5012, SHT45, LEDs, switches) first with SAC305,
+   then the few bottom passives and J6 with SnBi or by iron.
+
+Practical choices for hand assembly: 0603 passives where there is room, 0402
+only in tight spots; one stencil per side; windowpane paste on exposed pads
+(LAN8651, LP5012, TPS2660) to avoid floating; flux-cleaning access to the
+SHT45 (it must not be contaminated, so solder it last, no-clean flux, no
+washing).
+
 ## 6. Bring-up / test features
 
 * Tag-Connect TC2030 (or 6 pads): UART0 + EN + GPIO9 (boot) for flashing; USB

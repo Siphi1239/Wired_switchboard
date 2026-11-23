@@ -423,6 +423,11 @@ def build_base(pcbnew, board):
     term = [(-20, 13), (20, 13), (14, 21), (-14, 21)]
     poly_outline(pcbnew, board, pcbnew.B_Fab, term, 0.12)
     text(pcbnew, board, pcbnew.B_Fab, (0, 19.5), "BOTTOM: J1 bus / J2 shield / J3 load terminals", 0.6)
+    # Bottom side (box floor): power, bulk cap, output block, passives. Max 8 mm.
+    bot = [(-22, -9), (22, -9), (21.5, 11.5), (-21.5, 11.5)]
+    poly_outline(pcbnew, board, pcbnew.B_Fab, bot, 0.12)
+    text(pcbnew, board, pcbnew.B_Fab, (0, -7.5), "BOTTOM: power / C5 bulk / PoDL choke / outputs, h <= 8 mm", 0.6)
+    text(pcbnew, board, CMT, (0, -1.5), "TOP h <= 5 mm (B2B stack 8 mm)", 0.6)
 
     text(pcbnew, board, pcbnew.F_SilkS, (0, 22.5), "WIRED SWITCHBOARD BASE rev A", 0.8)
     text(pcbnew, board, F_FAB, (0, 0), "+ box axis", 0.6)
@@ -465,6 +470,7 @@ def build_front(pcbnew, board):
     footprint(pcbnew, board, "Connector_PinSocket_1.27mm", "PinSocket_2x06_P1.27mm_Vertical_SMD", "J6",
               "B2B 2x6 1.27", B2B_POS, rot=90, back=True)
 
+    text(pcbnew, board, pcbnew.B_Fab, (0, -16), "BOTTOM: passives h <= 1.5 mm (except J6)", 0.6)
     poly_outline(pcbnew, board, CMT, [(-5, -12), (5, -12), (5, -5), (-5, -5)], 0.12)
     text(pcbnew, board, CMT, (-4.5, -13), "U10 LP5012 + passives", 0.6)
     text(pcbnew, board, pcbnew.F_SilkS, (0, -20.5), "WIRED SWITCHBOARD FRONT rev A", 0.8)
