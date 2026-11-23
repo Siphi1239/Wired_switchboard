@@ -8,7 +8,7 @@ Per node:
 
 * **2 keys** by default, up to 4 (momentary wall switches) → Matter Generic Switch events, MQTT
   events, and local control of outputs
-* up to 4 **low-voltage PWM outputs** (MOSFET, 12/24 V LED strips) → Matter
+* **2 optional low-voltage PWM outputs**, 2 A each (MOSFET, 12/24 V LED strips; assembly variant detected at boot) → Matter
   Dimmable Light, HA MQTT light
 * one **indicator LED** per key (WS2812 on the DevKit, TI LP5012 on the custom board) → follow their output or
   are driven remotely
@@ -106,15 +106,15 @@ Local toggling happens on *release*, so it isn't delayed by the multi-press
 window. For a double press, that means the output toggles first and then goes
 to 100 %.
 
-### Matter endpoints (default: 2 keys / 4 outputs / 2 LEDs / sensor)
+### Matter endpoints (default: 2 keys / 2 outputs if fitted / 2 LEDs / sensor)
 
 | EP | Device type | Purpose |
 |---|---|---|
 | 0 | Root Node | Ethernet network commissioning, OTA requestor |
 | 1–2 | Generic Switch | keys |
-| 3–6 | Dimmable Light | outputs (2 A each; outputs 3–4 remote-only with 2 keys) |
-| 7–8 | On/Off Light | key LEDs (when not in "follow" mode) |
-| 9, 10 | Temperature, Humidity Sensor | SHT4x (only if detected) |
+| 3–4 | Dimmable Light | outputs (only on the output variant; numbering below shifts on the keypad variant) |
+| 5–6 | On/Off Light | key LEDs (when not in "follow" mode) |
+| 7, 8 | Temperature, Humidity Sensor | SHT4x (only if detected) |
 
 ### MQTT topics
 
@@ -136,7 +136,7 @@ to 100 %.
 | LAN8651 SCLK / MOSI / MISO / CS | 6 / 7 / 2 / 10 | SPI2, 20 MHz (LAN865x max 25) |
 | LAN8651 IRQ_N / RESET_N | 11 / 3 | |
 | Keys 0–3 | 0, 1, 4, 5 | active low, internal pull-up. Fit external pull-ups + RC + TVS for wall cabling |
-| PWM outputs 0–3 | 18, 19, 20, 21 | LEDC 12 bit @ 19.5 kHz → logic-level MOSFET gate drivers |
+| PWM outputs 0–1 (2–3 spare) | 18, 19 (20, 21) | LEDC 12 bit @ 19.5 kHz → logic-level MOSFET gate drivers |
 | WS2812 data | 8 | on-board RGB LED = indicator 0 |
 | I2C SDA / SCL | 22 / 23 | SHT4x @ 0x44 |
 | Factory reset | 9 (BOOT) | hold 10 s |

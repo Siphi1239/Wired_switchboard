@@ -1,4 +1,5 @@
 #include "outputs.h"
+#include "board.h"
 #include "device_model.h"
 
 #include <math.h>
@@ -31,7 +32,7 @@ static uint32_t level_to_duty(const dm_output_state_t *st)
 
 static void dm_listener(const dm_event_t *ev, void *ctx)
 {
-    if (ev->type != DM_EV_OUTPUT || ev->idx >= CONFIG_OUTPUT_COUNT) {
+    if (ev->type != DM_EV_OUTPUT || ev->idx >= board_output_count()) {
         return;
     }
     uint32_t duty = level_to_duty(&ev->output);
@@ -48,7 +49,7 @@ static void dm_listener(const dm_event_t *ev, void *ctx)
 
 esp_err_t outputs_init(void)
 {
-    if (CONFIG_OUTPUT_COUNT == 0) {
+    if (board_output_count() == 0) {
         return ESP_OK;
     }
 
@@ -61,7 +62,7 @@ esp_err_t outputs_init(void)
     };
     ESP_RETURN_ON_ERROR(ledc_timer_config(&tcfg), TAG, "timer");
 
-    for (int i = 0; i < CONFIG_OUTPUT_COUNT; i++) {
+    for (int i = 0; i < board_output_count(); i++) {
         const ledc_channel_config_t ccfg = {
             .gpio_num = s_gpios[i],
             .speed_mode = PWM_MODE,
@@ -75,6 +76,6 @@ esp_err_t outputs_init(void)
     ESP_RETURN_ON_ERROR(ledc_fade_func_install(0), TAG, "fade");
     ESP_RETURN_ON_ERROR(dm_register_listener(dm_listener, NULL), TAG, "listener");
 
-    ESP_LOGI(TAG, "%d PWM output(s) @ %d Hz, 12 bit", CONFIG_OUTPUT_COUNT, CONFIG_OUTPUT_PWM_FREQ_HZ);
+    ESP_LOGI(TAG, "%u PWM output(s) @ %d Hz, 12 bit", board_output_count(), CONFIG_OUTPUT_PWM_FREQ_HZ);
     return ESP_OK;
 }

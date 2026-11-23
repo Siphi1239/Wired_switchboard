@@ -25,7 +25,7 @@ datasheet details before layout.
       │      │                   │
       │      └──┬──┬──┬──┬──┬──┬─┘  push-in terminals on the back side
       │         │  │  │  │  │  │
-      │      T1S in/out, 24 V load supply, 4 outputs
+      │      T1S in/out, [24 V load supply, 2 outputs: optional]
       │   ────────────────────────── box floor (47 mm, better 61 mm "deep")
 ```
 
@@ -85,8 +85,11 @@ distribution board.
          │                             via cap, jumper]  │  │     (3V3, keys, I2C, IRQ)
          └─ PoDL L (2×) ─ TVS ─ eFuse ─ buck 3.3 V ──────┘  │
                                  │                          │ 4× PWM
- 24 V LOAD IN ─ fuse ─ TVS ─┬─ LDO 12 V ─ 2× dual gate driver ─ 4× N-MOSFET ─ OUT1..4
-                            └─────────────── common +24 V to loads ───────────── COM+
+ ┌ OUTPUT OPTION (DNP on "keypad" variant) ──────────────────────────────────────────────┐
+ │24 V LOAD IN ─ fuse ─ TVS ─┬─ LDO 12 V ─ 1× dual gate driver ─ 2× N-MOSFET ─ OUT1..2  │
+ │                           └─────────────── common +24 V to loads ──────────── COM+   │
+ └───────────────────────────────────────────────────────────────────────────────────────┘
+ Variant ID: resistor divider on an ADC pin tells the firmware which option is fitted.
 ```
 
 ### Parts
@@ -103,10 +106,10 @@ distribution board.
 | Buck input filter | LC / π filter between eFuse and buck | AN1848 §6.3: extra noise on the PoDL setup was likely from the DC/DC with only 1 µF input filtering |
 | 3.3 V | **TI LMR36006** (60 V, 0.6 A buck) | 60 V rating gives surge margin on a 24 V bus. Load ≈ 120 mA peak. |
 | Gate supply | 12 V LDO from the **load** supply | outputs can only switch when the load supply is present |
-| Gate drivers | **2 × TI UCC27524A** (dual low-side) | see "PWM switching" below |
-| Output switches | 4 × N-MOSFET, 40 V, R_DS(on) < 15 mΩ at V_GS = 10 V, I_D ≥ 10 A, 3 × 3 mm packages | **2 A per output**; low-side switching (common-anode LED strips). Conduction loss 2² · 15 mΩ = 60 mW per channel. |
-| Output protection | 10 A fuse on the load input + per-channel current sense (10 mΩ shunt + comparator, trip ≈ 3 A) | 4 × 2 A = 8 A worst case per node; hardware trip on short circuit, firmware reports it |
-| Bus / load terminals | push-in PCB terminals: bus for 0.2–0.8 mm solid (J-Y(St)Y), load for 1.5 mm², ≥ 10 A | 4 bus (in/out) + 2 load-in + 4 outputs + **2 × COM+** (shares the up to 8 A return to the strips). 1.5 mm² copper and 2 A per strip keep wiring losses low. |
+| Gate drivers | **1 × TI UCC27524A** (dual low-side) | see "PWM switching" below |
+| Output switches | 2 × N-MOSFET, 40 V, R_DS(on) < 15 mΩ at V_GS = 10 V, I_D ≥ 10 A, 3 × 3 mm packages | **2 A per output**; low-side switching (common-anode LED strips). Conduction loss 2² · 15 mΩ = 60 mW per channel. |
+| Output protection | 5 A fuse on the load input + per-channel current sense (10 mΩ shunt + comparator, trip ≈ 3 A) | 2 × 2 A = 4 A worst case per node; hardware trip on short circuit, firmware reports it |
+| Bus / load terminals | push-in PCB terminals: bus for 0.2–0.8 mm solid (J-Y(St)Y), load for 1.5 mm², ≥ 10 A | 4 bus (in/out) + 2 load-in + 2 outputs + 1 × COM+ (up to 4 A). 1.5 mm² copper and 2 A per strip keep wiring losses low. |
 
 ### PWM switching: why gate drivers
 
@@ -121,20 +124,19 @@ are not too fast also keep EMI off the T1S pair running in the same box.
 Alternative without drivers: drop the PWM to ~2–4 kHz (`CONFIG_OUTPUT_PWM_FREQ_HZ`).
 That's still flicker-free to the eye, but can show banding on camera.
 
-Heat budget at full load (4 × 2 A, PWM active):
+Heat budget at full load (2 × 2 A, PWM active):
 
 | Source | Loss |
 |---|---|
 | Electronics from PoDL (≈ 0.5 W nominal, 2.4 W max at 100 mA) | 0.5 W |
-| MOSFET conduction, 4 × 60 mW | 0.24 W |
-| MOSFET switching with gate drivers, 4 × ≈ 0.2 W | 0.8 W |
-| Shunts, 4 × 2² · 10 mΩ | 0.16 W |
-| **Total** | **≈ 1.7 W** |
+| MOSFET conduction, 2 × 60 mW | 0.12 W |
+| MOSFET switching with gate drivers, 2 × ≈ 0.2 W | 0.4 W |
+| Shunts, 2 × 2² · 10 mΩ | 0.08 W |
+| **Total** | **≈ 1.1 W** |
 
-That's acceptable for a 61 mm box, but it's the worst case (every channel
-PWM-dimmed at 2 A). At 100 % duty, switching losses vanish (≈ 0.9 W total).
-If the thermal test shows > 40 K rise, lower the PWM to ~8 kHz, which halves
-the switching loss.
+That's inside the 1.5 W target, even in the worst case (both channels
+PWM-dimmed at 2 A). At 100 % duty, switching losses vanish (≈ 0.7 W total).
+The keypad variant (no outputs) dissipates only the electronics, ≈ 0.5 W.
 
 ### Grounding
 
@@ -223,6 +225,19 @@ My recommendation: **design rev A as the two-board stack** (it covers all
 four functions you want), and keep the interface variant as an option for
 rooms where you want a specific switch range.
 
+### Assembly variants
+
+| Variant | Fitted | Use |
+|---|---|---|
+| **Keypad** | base without the output block | wall switch + LEDs + sensor; controls other devices via Matter/MQTT |
+| **Keypad + 2 outputs** | full base | also dims up to 2 × 2 A LED loads locally |
+
+The output block (load terminals, fuse, TVS, 12 V LDO, gate driver, MOSFETs,
+shunts) sits in one PCB area, so DNP leaves no dead copper in the way.
+**Variant ID:** a resistor divider on a spare ADC GPIO (e.g. 10 k / 0 Ω vs
+10 k / 10 k) is read at boot. One firmware image serves both variants. The
+`sb outputs` console setting overrides it for the DevKit.
+
 ## 6. Bring-up / test features
 
 * Tag-Connect TC2030 (or 6 pads): UART0 + EN + GPIO9 (boot) for flashing; USB
@@ -236,10 +251,10 @@ rooms where you want a specific switch range.
 ## 7. Open points before layout
 
 1. ~~Bus voltage~~: **24 V**, **100 mA per node**, PSE limit ≈ 1 A for 8 nodes.
-2. ~~Load current~~: **2 A per output**, 8 A worst case per node (10 A fuse).
+2. ~~Load current~~: **2 A per output**, **2 optional outputs**, 4 A worst case per node (5 A fuse).
 3. **Cable**: J-Y(St)Y 2×2×0.8 with one pair for T1S + PoDL. The second pair is
    only good for small loads (≈ 0.7 Ω loop resistance at 10 m).
-4. ~~Key layout~~: **2 keys**. The base board keeps 4 key inputs and 4 outputs, so
-   outputs 3–4 are remote-only (Matter/MQTT) unless a 4-key front is fitted.
+4. ~~Key layout~~: **2 keys**, key n drives output n locally when fitted. The base
+   board keeps 4 key inputs (spare B2B pins) for a later 4-key front.
 5. **Enclosure for the caps**: 3D-printed first, then compatible with a
    chosen 50 × 50 / 55 × 55 frame system.

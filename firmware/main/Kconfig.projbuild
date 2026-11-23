@@ -86,9 +86,20 @@ menu "Wired Switchboard"
 
     menu "Low-voltage PWM outputs (dimmable)"
         config OUTPUT_COUNT
-            int "Number of outputs"
+            int "Outputs when fitted (max)"
             range 0 4
-            default 4
+            default 2
+            help
+                Number of PWM outputs on the "with outputs" assembly variant.
+                At boot the actual count is: console override (sb outputs) if
+                set, else the variant-ID strap (BOARD_VARIANT_ADC_GPIO), else
+                this value.
+        config BOARD_VARIANT_ADC_GPIO
+            int "Variant-ID strap ADC GPIO (-1 = none, e.g. DevKit)"
+            default -1
+            help
+                Divider on this pin: ~0 V = keypad variant (no outputs),
+                ~VDD/2 = outputs fitted. ESP32-C6 ADC1 pins are GPIO0-6.
         config OUTPUT_GPIO_0
             int "Output 0 GPIO"
             default 18

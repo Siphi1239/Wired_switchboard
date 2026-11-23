@@ -23,6 +23,7 @@ typedef struct {
     char mqtt_pass[APP_PASS_MAX];
     int8_t key_map[DM_MAX_KEYS];    /* key -> local output, -1 = events only */
     uint8_t ind_follow_mask;        /* bit n: indicator n mirrors output key_map[n] */
+    int8_t output_override;         /* -1 = auto (strap / Kconfig), else fitted outputs */
 } app_config_t;
 
 esp_err_t app_settings_init(void);
@@ -33,6 +34,8 @@ esp_err_t app_settings_set_plca(uint8_t node_id, uint8_t node_count);
 esp_err_t app_settings_set_mqtt(const char *uri, const char *user, const char *pass);
 esp_err_t app_settings_set_key_map(uint8_t key, int8_t output);
 esp_err_t app_settings_set_ind_follow(uint8_t mask);
+/* -1 = auto. Takes effect after reboot (Matter endpoints are created at boot). */
+esp_err_t app_settings_set_output_override(int8_t count);
 
 /* Erase app + device-model NVS namespaces. Matter fabrics are separate
  * (esp_matter::factory_reset()). */

@@ -15,6 +15,7 @@
  */
 #include "matter_app.h"
 #include "app_settings.h"
+#include "board.h"
 #include "device_model.h"
 #include "sensors.h"
 #include "sdkconfig.h"
@@ -232,7 +233,7 @@ esp_err_t matter_app_init(void)
         s_key_ep[i] = endpoint::get_id(ep);
     }
 
-    for (uint8_t i = 0; i < CONFIG_OUTPUT_COUNT; i++) {
+    for (uint8_t i = 0; i < board_output_count(); i++) {
         dimmable_light::config_t cfg;
         cfg.on_off.on_off = false;                              /* real state pushed after start */
         cfg.on_off_lighting.start_up_on_off = nullptr;          /* = previous; DM restores */
@@ -271,8 +272,8 @@ esp_err_t matter_app_init(void)
         s_hum_ep = h ? endpoint::get_id(h) : 0;
     }
 
-    ESP_LOGI(TAG, "endpoints: %d key(s) from ep %u, %d output(s) from ep %u, %d LED(s), sensors %s",
-             CONFIG_KEY_COUNT, s_key_ep[0], CONFIG_OUTPUT_COUNT, s_out_ep[0], CONFIG_INDICATOR_COUNT,
+    ESP_LOGI(TAG, "endpoints: %d key(s) from ep %u, %u output(s) from ep %u, %d LED(s), sensors %s",
+             CONFIG_KEY_COUNT, s_key_ep[0], board_output_count(), s_out_ep[0], CONFIG_INDICATOR_COUNT,
              sensors_present() ? "yes" : "no");
     return dm_register_listener(dm_listener, nullptr);
 }

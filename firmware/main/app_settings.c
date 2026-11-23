@@ -21,9 +21,10 @@ static void defaults(void)
     strlcpy(s_cfg.mqtt_uri, CONFIG_APP_MQTT_BROKER_URI, sizeof(s_cfg.mqtt_uri));
 #endif
     for (int i = 0; i < DM_MAX_KEYS; i++) {
-        s_cfg.key_map[i] = (i < CONFIG_OUTPUT_COUNT) ? i : -1;
+        s_cfg.key_map[i] = (i < CONFIG_OUTPUT_COUNT) ? i : -1;  /* ignored if not fitted */
     }
     s_cfg.ind_follow_mask = 0xFF;
+    s_cfg.output_override = -1;
 }
 
 static void load_str(nvs_handle_t h, const char *key, char *dst, size_t size)
@@ -53,6 +54,7 @@ esp_err_t app_settings_init(void)
     nvs_get_u8(h, "plca_id", &s_cfg.plca_node_id);
     nvs_get_u8(h, "plca_cnt", &s_cfg.plca_node_count);
     nvs_get_u8(h, "ind_follow", &s_cfg.ind_follow_mask);
+    nvs_get_i8(h, "outputs", &s_cfg.output_override);
     len = sizeof(s_cfg.key_map);
     nvs_get_blob(h, "key_map", s_cfg.key_map, &len);
     nvs_close(h);
@@ -153,6 +155,22 @@ esp_err_t app_settings_set_ind_follow(uint8_t mask)
 {
     s_cfg.ind_follow_mask = mask;
     return save_u8("ind_follow", mask);
+}
+
+esp_err_t app_settings_set_output_override(int8_t count)
+{
+    nvs_handle_t h;
+
+    ESP_RETURN_ON_FALSE(count >= -1 && count <= CONFIG_OUTPUT_COUNT, ESP_ERR_INVALID_ARG, TAG,
+                        "outputs: -1 (auto) .. %d", CONFIG_OUTPUT_COUNT);
+    s_cfg.output_override = count;
+    ESP_RETURN_ON_ERROR(nvs_open(NS, NVS_READWRITE, &h), TAG, "open");
+    esp_err_t err = nvs_set_i8(h, "outputs", count);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err;
 }
 
 esp_err_t app_settings_erase(void)

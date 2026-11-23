@@ -7,10 +7,12 @@
  *   sb follow <mask>                 indicators mirroring their key's output (hex/dec)
  *   sb out <n> on|off|toggle|<1-254>
  *   sb led <n> on|off
+ *   sb outputs auto|<0..N>          fitted outputs override, reboot to apply
  *   sb factory-reset                 erase app config AND Matter fabrics, reboot
  */
 #include "app_console.h"
 #include "app_settings.h"
+#include "board.h"
 #include "device_model.h"
 #include "eth_t1s.h"
 #include "matter_app.h"
@@ -25,7 +27,7 @@ static int usage(void)
 {
     printf("usage: sb show | name <id> | plca <id> [cnt] | mqtt <uri>|off [user] [pass] |\n"
            "          map <key> <out|-1> | follow <mask> | out <n> on|off|toggle|<1-254> |\n"
-           "          led <n> on|off | factory-reset\n");
+           "          led <n> on|off | outputs auto|<n> | factory-reset\n");
     return 1;
 }
 
@@ -35,6 +37,7 @@ static void show(void)
 
     printf("name      : %s\n", c->name);
     printf("device id : %s\n", eth_t1s_device_id());
+    printf("variant   : %u output(s) (%s)\n", board_output_count(), board_variant_source());
     eth_t1s_print_status();
     printf("matter    : %s\n", matter_app_commissioned() ? "commissioned" : "not commissioned");
     printf("mqtt      : %s (%s)\n", c->mqtt_uri[0] ? c->mqtt_uri : "off",
@@ -133,6 +136,14 @@ static int cmd_sb(int argc, char **argv)
     }
     if (!strcmp(sub, "led") && argc == 4) {
         return check(dm_indicator_set(strtol(argv[2], NULL, 0), !strcmp(argv[3], "on"), DM_SRC_CONSOLE));
+    }
+    if (!strcmp(sub, "outputs") && argc == 3) {
+        int8_t n = strcmp(argv[2], "auto") ? (int8_t)strtol(argv[2], NULL, 0) : -1;
+        int r = check(app_settings_set_output_override(n));
+        if (!r) {
+            printf("reboot to apply. Matter endpoints change: re-interview or re-commission the node\n");
+        }
+        return r;
     }
     if (!strcmp(sub, "factory-reset")) {
         printf("erasing configuration and Matter fabrics, rebooting...\n");

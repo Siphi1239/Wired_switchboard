@@ -2,7 +2,7 @@
  * Wired Switchboard - ESP32-C6 + LAN8651 10BASE-T1S, powered over the data line.
  *
  * Init order:
- *   1. NVS, settings
+ *   1. NVS, settings, assembly variant (number of fitted outputs)
  *   2. drivers + logic register as device-model listeners (outputs, indicators,
  *      local control, MQTT); sensors are probed so Matter knows what exists
  *   3. Matter data model (endpoints) + its DM listener
@@ -13,6 +13,7 @@
  */
 #include "app_console.h"
 #include "app_settings.h"
+#include "board.h"
 #include "device_model.h"
 #include "eth_t1s.h"
 #include "indicators.h"
@@ -56,6 +57,7 @@ extern "C" void app_main(void)
     CHECK(err);
 
     CHECK(app_settings_init());
+    board_init();
     CHECK(eth_t1s_preinit());
 
     CHECK(outputs_init());
@@ -65,7 +67,7 @@ extern "C" void app_main(void)
     CHECK(mqtt_app_init());
     CHECK(matter_app_init());
 
-    CHECK(dm_init(CONFIG_KEY_COUNT, CONFIG_OUTPUT_COUNT, CONFIG_INDICATOR_COUNT));
+    CHECK(dm_init(CONFIG_KEY_COUNT, board_output_count(), CONFIG_INDICATOR_COUNT));
     CHECK(inputs_init(on_factory_reset_button));
 
     CHECK(matter_app_start());

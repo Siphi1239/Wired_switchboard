@@ -5,7 +5,7 @@ Ethernet (Microchip **LAN8651** MAC-PHY over SPI), **powered over the data line*
 speaking **Matter** (over Ethernet) and **MQTT** (Home Assistant discovery).
 
 * Keys (wall switches): Matter Generic Switch events, MQTT events, local control
-* Low-voltage PWM outputs: dimmable lights
+* 2 optional low-voltage PWM outputs (2 A): dimmable lights
 * Key indicator LEDs (WS2812)
 * Temperature / humidity (SHT4x)
 
@@ -34,6 +34,7 @@ firmware/
     sensors.*         SHT4x
     local_control.*   offline key -> output logic, LED follow
     app_settings.*    NVS config        app_console.c   `sb` commands
+    board.*           assembly variant (outputs fitted?) via strap / override
     Kconfig.projbuild pins and counts   idf_component.yml
 docs/architecture.md
 ```
