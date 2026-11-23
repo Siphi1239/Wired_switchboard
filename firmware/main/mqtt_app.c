@@ -110,8 +110,8 @@ static void discovery(void)
     const char *id = eth_t1s_device_id();
     const char *name = app_cfg()->name;
     char topic[TOPIC_MAX];
-    char dev[192];
-    char *buf = malloc(640);
+    char dev[320];
+    char *buf = malloc(896);
 
     if (!buf) {
         return;
@@ -123,7 +123,7 @@ static void discovery(void)
 
     for (uint8_t i = 0; i < dm_output_count(); i++) {
         snprintf(topic, sizeof(topic), CONFIG_APP_MQTT_HA_PREFIX "/light/%s/out%u/config", id, i);
-        snprintf(buf, 640,
+        snprintf(buf, 896,
                  "{\"name\":\"Output %u\",\"uniq_id\":\"%s_out%u\",\"schema\":\"json\","
                  "\"stat_t\":\"%s/out/%u/state\",\"cmd_t\":\"%s/out/%u/set\","
                  "\"brightness\":true,\"brightness_scale\":254,%s}",
@@ -132,7 +132,7 @@ static void discovery(void)
     }
     for (uint8_t i = 0; i < dm_indicator_count(); i++) {
         snprintf(topic, sizeof(topic), CONFIG_APP_MQTT_HA_PREFIX "/switch/%s/ind%u/config", id, i);
-        snprintf(buf, 640,
+        snprintf(buf, 896,
                  "{\"name\":\"Key %u LED\",\"uniq_id\":\"%s_ind%u\",\"ent_cat\":\"config\","
                  "\"stat_t\":\"%s/ind/%u/state\",\"cmd_t\":\"%s/ind/%u/set\",%s}",
                  i + 1, id, i, s_base, i, s_base, i, dev);
@@ -140,7 +140,7 @@ static void discovery(void)
     }
     for (uint8_t i = 0; i < dm_key_count(); i++) {
         snprintf(topic, sizeof(topic), CONFIG_APP_MQTT_HA_PREFIX "/event/%s/key%u/config", id, i);
-        snprintf(buf, 640,
+        snprintf(buf, 896,
                  "{\"name\":\"Key %u\",\"uniq_id\":\"%s_key%u\",\"dev_cla\":\"button\","
                  "\"evt_typ\":[\"single\",\"double\",\"triple\",\"long_press\",\"long_release\"],"
                  "\"stat_t\":\"%s/key/%u/event\",%s}",
@@ -149,14 +149,14 @@ static void discovery(void)
     }
     if (sensors_present()) {
         snprintf(topic, sizeof(topic), CONFIG_APP_MQTT_HA_PREFIX "/sensor/%s/temperature/config", id);
-        snprintf(buf, 640,
+        snprintf(buf, 896,
                  "{\"name\":\"Temperature\",\"uniq_id\":\"%s_temp\",\"dev_cla\":\"temperature\","
                  "\"unit_of_meas\":\"\xC2\xB0" "C\",\"stat_cla\":\"measurement\","
                  "\"stat_t\":\"%s/sensor/temperature\",%s}",
                  id, s_base, dev);
         pub(topic, buf, true);
         snprintf(topic, sizeof(topic), CONFIG_APP_MQTT_HA_PREFIX "/sensor/%s/humidity/config", id);
-        snprintf(buf, 640,
+        snprintf(buf, 896,
                  "{\"name\":\"Humidity\",\"uniq_id\":\"%s_hum\",\"dev_cla\":\"humidity\","
                  "\"unit_of_meas\":\"%%\",\"stat_cla\":\"measurement\","
                  "\"stat_t\":\"%s/sensor/humidity\",%s}",
@@ -165,7 +165,7 @@ static void discovery(void)
     }
     if (power_mon_present()) {
         snprintf(topic, sizeof(topic), CONFIG_APP_MQTT_HA_PREFIX "/sensor/%s/bus_voltage/config", id);
-        snprintf(buf, 640,
+        snprintf(buf, 896,
                  "{\"name\":\"Bus voltage\",\"uniq_id\":\"%s_vbus\",\"dev_cla\":\"voltage\","
                  "\"unit_of_meas\":\"V\",\"stat_cla\":\"measurement\",\"ent_cat\":\"diagnostic\","
                  "\"stat_t\":\"%s/sensor/bus_voltage\",%s}",

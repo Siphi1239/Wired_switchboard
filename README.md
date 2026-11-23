@@ -52,8 +52,9 @@ cd esp-matter
 git submodule update --init --depth 1
 cd connectedhomeip/connectedhomeip
 ./scripts/checkout_submodules.py --platform esp32 linux --shallow
-# Ethernet hook for SPI MAC-PHYs (required, the build stops without it):
-git apply ~/src/wired_switchboard/firmware/patches/0001-esp32-ethernet-app-init-hook.patch
+# Required patches (the build stops without them):
+#  0001 Ethernet hook for SPI MAC-PHYs, 0002 Kconfig GPIO range for ESP32-C6
+git apply ~/src/wired_switchboard/firmware/patches/*.patch
 cd ../..
 . ~/esp/esp-idf/export.sh
 ./install.sh
@@ -64,6 +65,10 @@ Per shell:
 ```bash
 . ~/esp/esp-idf/export.sh && . ~/esp/esp-matter/export.sh
 ```
+
+Or let the script do all of the above: `tools/setup_esp.sh ~/esp ~/src/wired_switchboard`
+(it also works around a Python 3.13 pip conflict in Matter's optional host-tool env),
+then `tools/build.sh ~/esp ~/src/wired_switchboard devkit|reva`.
 
 ## Build, flash, monitor (ESP32-C6-DevKitC-1-N8)
 
@@ -137,15 +142,15 @@ entities. Both stay in sync on the device, so mixing works.
 
 ## Verification status
 
-**Not compiled and not run.** ESP-IDF and the component registry weren't
-available in the environment this was written in. What was checked:
+**Builds, not yet run on hardware.** Both configurations compile and link
+with ESP-IDF v6.0.2 + esp-matter release/v1.6.1 (connectedhomeip `0998b87db7`
+with `firmware/patches/*` applied):
 
-* the hook patch applies cleanly to the pinned connectedhomeip `0998b87db7`
-* esp-matter 1.6.1 APIs used (endpoint/cluster configs, switch events, attribute
-  update, console) against the release branch sources
-* LAN865x / PLCA ioctls against `espressif/esp-eth-drivers`
-* ESP-IDF v6.0.2 Ethernet/netif/MAC APIs, esp-mqtt config fields, led_strip 3.x
-* every `CONFIG_` symbol in `sdkconfig.defaults` that comes from the chip /
-  esp_matter / esp_eth / lwIP Kconfig files exists
+| Config | Image | Free in 3 MB OTA slot | Static DIRAM |
+|---|---|---|---|
+| DevKitC-1 (WS2812, BOOT reset) | 1.73 MB | 45 % | 162 kB of 452 kB (36 %) |
+| rev A (LP5012, power_mon, UART console) | 1.72 MB | 45 % | similar |
 
-Expect a round of small fixes on the first `idf.py build`.
+`dependencies.lock` pins the managed components (lan865x, mqtt, led_strip, …).
+Next: flash the DevKit + Two-Wire ETH Click, bring up T1S/PLCA, commission
+over BLE.

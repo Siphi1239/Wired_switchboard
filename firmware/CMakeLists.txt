@@ -1,7 +1,7 @@
 # Wired Switchboard firmware - ESP32-C6 + LAN8651 10BASE-T1S, Matter + MQTT
 #
 # Requires: ESP-IDF v6.0.2, esp-matter release/v1.6.1 (ESP_MATTER_PATH) with
-# patches/0001-esp32-ethernet-app-init-hook.patch applied to connectedhomeip.
+# patches/0001-*.patch and 0002-*.patch applied to connectedhomeip.
 cmake_minimum_required(VERSION 3.16)
 
 if(NOT DEFINED ENV{ESP_MATTER_PATH})
@@ -25,6 +25,12 @@ string(FIND "${_eth_drv}" "esp_matter_app_ethernet_init" _hook)
 if(_hook EQUAL -1)
     message(FATAL_ERROR "connectedhomeip is missing the Ethernet app-init hook. Run:\n"
         "  git -C ${MATTER_SDK_PATH} apply ${CMAKE_CURRENT_LIST_DIR}/patches/0001-esp32-ethernet-app-init-hook.patch")
+endif()
+file(READ ${MATTER_SDK_PATH}/config/esp32/components/chip/Kconfig _chip_kconfig)
+string(FIND "${_chip_kconfig}" "if IDF_TARGET_ESP32C6" _c6range)
+if(_c6range EQUAL -1)
+    message(FATAL_ERROR "connectedhomeip Kconfig lacks the ESP32-C6 GPIO range. Run:\n"
+        "  git -C ${MATTER_SDK_PATH} apply ${CMAKE_CURRENT_LIST_DIR}/patches/0002-esp32-kconfig-gpio-range-c6.patch")
 endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)

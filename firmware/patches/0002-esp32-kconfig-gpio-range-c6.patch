@@ -1,0 +1,14 @@
+diff --git a/config/esp32/components/chip/Kconfig b/config/esp32/components/chip/Kconfig
+index db9795a7..ff2279a7 100644
+--- a/config/esp32/components/chip/Kconfig
++++ b/config/esp32/components/chip/Kconfig
+@@ -832,6 +832,9 @@ menu "CHIP Device Layer"
+             default 48 if IDF_TARGET_ESP32S3
+             default 26 if IDF_TARGET_ESP32H2
+             default 54 if IDF_TARGET_ESP32P4
++            default 30 if IDF_TARGET_ESP32C6
++            default 28 if IDF_TARGET_ESP32C5
++            default 29 if IDF_TARGET_ESP32C61
+ 
+         config ETH_MDC_GPIO
+             int "SMI MDC GPIO number"

@@ -1,5 +1,5 @@
 diff --git a/src/platform/ESP32/NetworkCommissioningDriver_Ethernet.cpp b/src/platform/ESP32/NetworkCommissioningDriver_Ethernet.cpp
-index 4c9357f..e457a49 100644
+index 4c9357f0..e9e1c986 100644
 --- a/src/platform/ESP32/NetworkCommissioningDriver_Ethernet.cpp
 +++ b/src/platform/ESP32/NetworkCommissioningDriver_Ethernet.cpp
 @@ -21,6 +21,15 @@
@@ -35,7 +35,7 @@ index 4c9357f..e457a49 100644
 +    }
 +    else
 +    {
-+#if CONFIG_ETH_USE_ESP32_EMAC || CONFIG_ETH_USE_OPENETH
++#if defined(CONFIG_ETH_USE_ESP32_EMAC) || defined(CONFIG_ETH_USE_OPENETH)
 +        // Init MAC and PHY configs to default
 +        eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
 +        eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();

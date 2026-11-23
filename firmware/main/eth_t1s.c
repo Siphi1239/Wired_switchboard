@@ -201,7 +201,7 @@ esp_err_t esp_matter_app_ethernet_init(esp_netif_t *eth_netif, esp_eth_handle_t 
     }
 
     /* "<name>-<last 3 MAC bytes>" -> DHCP option 12 and mDNS */
-    static char host[32];
+    static char host[48];
     snprintf(host, sizeof(host), "%s-%s", cfg->name, &s_dev_id[6]);
     esp_netif_set_hostname(eth_netif, host);
 

@@ -7,4 +7,3 @@ compile_commands.json
 firmware/sdkconfig
 firmware/sdkconfig.old
 firmware/managed_components/
-firmware/dependencies.lock
