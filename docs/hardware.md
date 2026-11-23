@@ -10,6 +10,8 @@ datasheet details before layout.
 
 ---
 
+BOM draft: [`hardware/bom-revA.csv`](../hardware/bom-revA.csv) (variant column: ALL, OUT = output option, END = end-node termination).
+
 ## 1. Concept: two-board stack
 
 ```

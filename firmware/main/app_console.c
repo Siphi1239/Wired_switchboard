@@ -17,6 +17,7 @@
 #include "eth_t1s.h"
 #include "matter_app.h"
 #include "mqtt_app.h"
+#include "power_mon.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,6 +60,10 @@ static void show(void)
     int32_t v;
     if (dm_sensor_get(DM_SENSOR_TEMPERATURE, &v)) {
         printf("temp      : %ld.%02ld C\n", v / 100, labs(v) % 100);
+    }
+    if (dm_sensor_get(DM_SENSOR_BUS_VOLTAGE, &v)) {
+        printf("bus       : %ld.%02ld V (min %ld.%02ld V since boot)\n", v / 1000, (v % 1000) / 10,
+               (long)power_mon_min_mv() / 1000, ((long)power_mon_min_mv() % 1000) / 10);
     }
     if (dm_sensor_get(DM_SENSOR_HUMIDITY, &v)) {
         printf("humidity  : %ld.%02ld %%\n", v / 100, v % 100);

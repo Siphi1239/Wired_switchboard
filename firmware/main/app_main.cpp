@@ -22,6 +22,7 @@
 #include "matter_app.h"
 #include "mqtt_app.h"
 #include "outputs.h"
+#include "power_mon.h"
 #include "sensors.h"
 
 #include <esp_app_desc.h>
@@ -69,6 +70,7 @@ extern "C" void app_main(void)
 
     CHECK(dm_init(CONFIG_KEY_COUNT, board_output_count(), CONFIG_INDICATOR_COUNT));
     CHECK(inputs_init(on_factory_reset_button));
+    CHECK(power_mon_init());
 
     CHECK(matter_app_start());
 #if CONFIG_ENABLE_CHIP_SHELL

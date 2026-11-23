@@ -47,6 +47,7 @@ typedef enum {
 typedef enum {
     DM_SENSOR_TEMPERATURE,  /* 0.01 degC */
     DM_SENSOR_HUMIDITY,     /* 0.01 %RH  */
+    DM_SENSOR_BUS_VOLTAGE,  /* mV (power_mon) */
     DM_SENSOR_COUNT,
 } dm_sensor_t;
 
@@ -103,6 +104,9 @@ void dm_key_event(uint8_t idx, dm_key_evt_t evt, uint8_t count);
 /* Called by the sensor driver. */
 void dm_sensor_update(dm_sensor_t sensor, int32_t value);
 bool dm_sensor_get(dm_sensor_t sensor, int32_t *value);
+
+/* Write pending output state to NVS now (brown-out). Safe from any task. */
+void dm_flush(void);
 
 const char *dm_source_str(dm_source_t src);
 const char *dm_key_evt_str(dm_key_evt_t evt);

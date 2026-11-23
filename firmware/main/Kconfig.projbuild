@@ -202,6 +202,37 @@ menu "Wired Switchboard"
             default 30
     endmenu
 
+    menu "Bus power monitor"
+        config POWER_MON_ADC_GPIO
+            int "Bus voltage sense ADC GPIO (-1 = none)"
+            default 0 if APP_BOARD_REVA
+            default -1
+            help
+                Divider from the bus (behind the eFuse) to an ADC1 pin (GPIO0-6).
+        config POWER_MON_R_TOP_KOHM
+            int "Divider top resistor [kOhm]"
+            default 100
+        config POWER_MON_R_BOTTOM_KOHM
+            int "Divider bottom resistor [kOhm]"
+            default 10
+        config POWER_MON_WARN_MV
+            int "Undervoltage warning [mV]"
+            default 20000
+            help
+                Below this the bus is considered weak: logged, reported, and the
+                output state is written to NVS immediately.
+        config POWER_MON_CRIT_MV
+            int "Brown-out threshold [mV]"
+            default 12000
+            help
+                Supply is about to collapse: persist state now. The 3.3 V buck
+                keeps regulating far below this, which leaves time to finish
+                the NVS write from the bulk capacitor.
+        config POWER_MON_REPORT_DELTA_MV
+            int "Report when the voltage changes by more than [mV]"
+            default 250
+    endmenu
+
     menu "MQTT"
         config APP_MQTT
             bool "MQTT front-end with Home Assistant discovery"

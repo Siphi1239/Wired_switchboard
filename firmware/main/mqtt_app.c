@@ -17,6 +17,7 @@
 #include "app_settings.h"
 #include "device_model.h"
 #include "eth_t1s.h"
+#include "power_mon.h"
 #include "sensors.h"
 
 #include <stdio.h>
@@ -78,8 +79,13 @@ static void pub_sensor(dm_sensor_t s)
     if (!dm_sensor_get(s, &v)) {
         return;
     }
-    snprintf(topic, sizeof(topic), "%s/sensor/%s", s_base, s == DM_SENSOR_TEMPERATURE ? "temperature" : "humidity");
-    snprintf(payload, sizeof(payload), "%s%ld.%02ld", v < 0 ? "-" : "", labs(v) / 100, labs(v) % 100);
+    static const char *const names[DM_SENSOR_COUNT] = { "temperature", "humidity", "bus_voltage" };
+    snprintf(topic, sizeof(topic), "%s/sensor/%s", s_base, names[s]);
+    if (s == DM_SENSOR_BUS_VOLTAGE) {
+        snprintf(payload, sizeof(payload), "%ld.%02ld", v / 1000, (v % 1000) / 10);
+    } else {
+        snprintf(payload, sizeof(payload), "%s%ld.%02ld", v < 0 ? "-" : "", labs(v) / 100, labs(v) % 100);
+    }
     pub(topic, payload, true);
 }
 
@@ -154,6 +160,15 @@ static void discovery(void)
                  "{\"name\":\"Humidity\",\"uniq_id\":\"%s_hum\",\"dev_cla\":\"humidity\","
                  "\"unit_of_meas\":\"%%\",\"stat_cla\":\"measurement\","
                  "\"stat_t\":\"%s/sensor/humidity\",%s}",
+                 id, s_base, dev);
+        pub(topic, buf, true);
+    }
+    if (power_mon_present()) {
+        snprintf(topic, sizeof(topic), CONFIG_APP_MQTT_HA_PREFIX "/sensor/%s/bus_voltage/config", id);
+        snprintf(buf, 640,
+                 "{\"name\":\"Bus voltage\",\"uniq_id\":\"%s_vbus\",\"dev_cla\":\"voltage\","
+                 "\"unit_of_meas\":\"V\",\"stat_cla\":\"measurement\",\"ent_cat\":\"diagnostic\","
+                 "\"stat_t\":\"%s/sensor/bus_voltage\",%s}",
                  id, s_base, dev);
         pub(topic, buf, true);
     }
@@ -244,6 +259,7 @@ static void on_connected(void)
     }
     pub_sensor(DM_SENSOR_TEMPERATURE);
     pub_sensor(DM_SENSOR_HUMIDITY);
+    pub_sensor(DM_SENSOR_BUS_VOLTAGE);
 }
 
 static void mqtt_event_cb(void *arg, esp_event_base_t base, int32_t id, void *data)

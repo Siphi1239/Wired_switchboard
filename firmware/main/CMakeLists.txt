@@ -12,6 +12,7 @@ idf_component_register(
          "app_console.c"
          "board.c"
          "i2c_bus.c"
+         "power_mon.c"
          "mqtt_app.c"
     PRIV_INCLUDE_DIRS "." "${ESP_MATTER_PATH}/examples/common/utils"
     # esp_matter_app_ethernet_init() is only weakly referenced by connectedhomeip:

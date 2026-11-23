@@ -1,0 +1,42 @@
+Board,Ref,Qty,Function,Part (candidate),Manufacturer,Package,Key spec,Variant,Notes
+BASE,U1,1,MCU + radio,ESP32-C6-WROOM-1-N8,Espressif,Module 25.5x18,8 MB flash; PCB antenna,ALL,Antenna at board edge; copper keep-out per datasheet
+BASE,U2,1,10BASE-T1S MAC-PHY,LAN8651B1,Microchip,VQFN-32 5x5,OA TC6 SPI; PLCA,ALL,Same part as MIKROE Two-Wire ETH Click
+BASE,Y2,1,LAN8651 clock,25 MHz crystal,TBD,3225,per LAN8651 datasheet,ALL,Check load capacitance in LAN8651 datasheet
+BASE,L1,1,T1S common-mode choke,ACT1210D-131-2P-TL00,TDK,1210,CMC for T1S,ALL,As on EVB-LAN8651 (AN1848 Fig. 6-2)
+BASE,C1-C2,2,T1S AC coupling,0.1 uF X7R,TBD,0603,>= 100 V,ALL,Series caps TRX_P/N; see full bus voltage
+BASE,R1-R2,2,Termination,49.9 R 1%,TBD,1206,,END,Split 100 R termination; DNP or jumper on mid-segment nodes
+BASE,C3-C4,2,Termination AC coupling,0.22 uF X7R,TBD,0805,>= 100 V,END,AC-coupled so PoDL DC is not loaded
+BASE,JP1,1,Termination enable,Solder jumper,-,-,,ALL,Silkscreen END NODE ONLY
+BASE,RV1-RV2,2,Line surge,AVRH10C221KT1R5YA8,TDK,0402,Varistor 220 V,ALL,As on EVB-LAN8651
+BASE,D1,1,T1S ESD,Low-C ESD array (TBD),TBD,SOT-23,< 3 pF; >= 33 V standoff,ALL,12 V automotive ESD parts are NOT suitable at 24 V
+BASE,R3-R4,2,MDI bleed,10 k,TBD,1206,,ALL,As on EVB-LAN8651
+BASE,L2,1,PoDL decoupling,47 uH DMC or coupled inductor (e.g. LPD5030-473MR),Coilcraft (example),5x5 mm,Isat >= 300 mA; matched; tol <= 20%,ALL,AN1848: DMC best noise margin
+BASE,U3,1,eFuse / inrush / reverse polarity,TPS2660,TI,HTSSOP-14,4.2-55 V; ILIM = 100 mA; dV/dt set,ALL,Current limit per node 100 mA
+BASE,D2,1,Bus TVS,SMBJ33A (or SMAJ33A),TBD,SMA/SMB,33 V standoff,ALL,Behind PoDL inductors
+BASE,C5,1,Bulk,100 uF / 50 V electrolytic or polymer,TBD,6.3x7.7,>= 35 V,ALL,Behind eFuse; carries node through brown-out NVS write
+BASE,L3+C6,1,Buck input filter,Ferrite / 4.7 uH + 10 uF / 50 V,TBD,0805/1210,,ALL,AN1848 6.3: DC/DC input filtering reduces bus noise
+BASE,U4,1,3.3 V buck,LMR36006 (3.3 V fixed),TI,SOT-23-THN,60 V in; 0.6 A,ALL,
+BASE,L4,1,Buck inductor,per LMR36006 datasheet,TBD,4x4,,ALL,
+BASE,R5-R6,2,VBUS sense divider,100 k / 10 k 1%,TBD,0603,,ALL,To GPIO0; plus 100 nF to GND
+BASE,R7-R8,2,Variant ID strap,10 k / (0 R or 10 k),TBD,0603,,ALL,GPIO1: 0 R = keypad; 10 k = outputs fitted
+BASE,J1,1,Bus terminals,Push-in PCB terminal 4-pole,WAGO 2060 series (example),SMD,0.2-0.75 mm2 solid (0.8 mm),ALL,T1S A in/out + B in/out (loop-through)
+BASE,J2,1,Shield terminals,Push-in PCB terminal 2-pole,WAGO 2060 series (example),SMD,,ALL,Shield in/out joined; not connected to GND
+BASE,J3,1,Load terminals,Push-in PCB terminal 5-pole,TBD,THT/THR 3.5-5 mm,1.5 mm2; >= 10 A,OUT,24 V in (+/-); OUT0; OUT1; COM+
+BASE,F1,1,Load fuse,5 A fast,TBD,1206/2410,,OUT,
+BASE,D3,1,Load TVS,SMBJ33A,TBD,SMB,,OUT,
+BASE,U5,1,Gate supply,12 V LDO from load supply,TBD,SOT-23-5,>= 36 V in,OUT,e.g. TPS7A25-class
+BASE,U6,1,Gate driver,UCC27524A,TI,SOIC-8/WSON-8,dual low-side 5 A,OUT,
+BASE,Q1-Q2,2,Output switches,N-MOSFET 40 V,TBD,3x3 PQFN,RDS(on) < 15 mOhm @ 10 V; ID >= 10 A,OUT,
+BASE,R9-R10,2,Current sense,10 mOhm 1%,TBD,1206,0.5 W,OUT,Trip ~3 A
+BASE,U7,1,Overcurrent comparator,Dual comparator open-drain,TBD,SOT-23-8,,OUT,Wired-OR to GPIO15 OUT_FAULT_N
+BASE,R11-R12,2,Gate / PWM pull-downs,100 k,TBD,0402,,OUT,Outputs off during boot
+BASE,J4,1,Board-to-board (base),2x6 1.27 mm header,Samtec FTSH/CLP (example),SMD,~8 mm stack,ALL,3V3; GND x2; KEY0-3; SDA; SCL; LP5012_EN; 2 spare
+BASE,J5,1,Programming,Tag-Connect TC2030 pads,Tag-Connect,pads,,ALL,UART0 TX/RX; EN; GPIO9; 3V3; GND
+BASE,R13-R14,2,I2C pull-ups,2.2 k,TBD,0402,,ALL,
+BASE,R15,1,GPIO8 strap pull-up,10 k,TBD,0402,,ALL,LP5012 EN; GPIO8 must be high at boot
+FRONT,SW1-SW2,2,Keys,Tact switch >= 1 M cycles,TBD,SMD 6x6 or 4x4,,ALL,Under 27 x 55 mm caps (55x55 system)
+FRONT,R/C (keys),4,Key RC filter,1 k + 100 nF,TBD,0402,,ALL,
+FRONT,U10,1,RGB LED driver,LP5012,TI,WQFN-20,I2C 0x14; 12 ch,ALL,Linear scale (log off in firmware)
+FRONT,LED1-LED2,2,Key LEDs,RGB LED side/top view,TBD,PLCC4 / 1.5x1.5,common anode not required (LP5012 sinks),ALL,Light pipes in caps
+FRONT,U11,1,Temp / humidity,SHT45,Sensirion,DFN-4 1.5x1.5,I2C 0x44,ALL,Thermal slot in PCB; vent slots in caps
+FRONT,J6,1,Board-to-board (front),2x6 1.27 mm socket,Samtec (example),SMD,,ALL,Mates J4

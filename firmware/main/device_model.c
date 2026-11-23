@@ -50,6 +50,14 @@ static void save_cb(void *arg)
     }
 }
 
+void dm_flush(void)
+{
+    if (s_save_timer && esp_timer_is_active(s_save_timer)) {
+        esp_timer_stop(s_save_timer);
+        save_cb(NULL);
+    }
+}
+
 static void restore(void)
 {
     nvs_handle_t h;
